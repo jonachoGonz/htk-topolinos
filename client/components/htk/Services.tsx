@@ -1,5 +1,5 @@
 import {
-  Heartbeat,
+  Heart,
   Activity,
   Brain,
   Apple,
@@ -11,7 +11,7 @@ const services = [
     title: "Evaluación Biomecánica",
     description:
       "Análisis preciso del movimiento para prevenir lesiones y optimizar el rendimiento deportivo.",
-    icon: Heartbeat,
+    icon: Heart,
   },
   {
     title: "Preparación Física",
