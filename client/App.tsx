@@ -1,7 +1,7 @@
 import "./global.css";
 
 import { Toaster } from "@/components/ui/toaster";
-import { createRoot } from "react-dom/client";
+import { createRoot, Root } from "react-dom/client";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -29,4 +29,18 @@ const App = () => (
   </QueryClientProvider>
 );
 
-createRoot(document.getElementById("root")!).render(<App />);
+// Store root reference in window for HMR support
+declare global {
+  interface Window {
+    __REACT_ROOT__?: Root;
+  }
+}
+
+const rootContainer = document.getElementById("root");
+
+if (rootContainer) {
+  if (!window.__REACT_ROOT__) {
+    window.__REACT_ROOT__ = createRoot(rootContainer);
+  }
+  window.__REACT_ROOT__.render(<App />);
+}
