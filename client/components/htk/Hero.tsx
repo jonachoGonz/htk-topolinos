@@ -1,4 +1,4 @@
-import { Star, Users, Barbell, Trophy, Clock } from "lucide-react";
+import { Star, Users, Dumbbell, Trophy, Clock } from "lucide-react";
 
 export default function Hero() {
   return (
@@ -52,7 +52,7 @@ export default function Hero() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <Barbell className="w-6 h-6 text-cyan-400 flex-shrink-0" />
+            <Dumbbell className="w-6 h-6 text-cyan-400 flex-shrink-0" />
             <div>
               <p className="text-xs uppercase text-gray-400 font-semibold">
                 Equipamiento Pro

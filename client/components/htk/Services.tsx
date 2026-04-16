@@ -3,7 +3,7 @@ import {
   Activity,
   Brain,
   Apple,
-  Barbell,
+  Dumbbell,
 } from "lucide-react";
 
 const services = [
@@ -44,7 +44,7 @@ const specialties = [
     title: "Entrenamiento",
     description:
       "Programas de entrenamiento de alta intensidad diseñados para atletas y equipos de alto rendimiento.",
-    icon: Barbell,
+    icon: Dumbbell,
   },
   {
     title: "Prep. Física",
