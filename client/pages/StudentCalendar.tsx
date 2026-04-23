@@ -14,6 +14,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { createBooking, cancelBooking } from "@/services/supabase";
 import Sidebar from "@/components/dashboard/Sidebar";
 import SlotCard, { type TimeSlot } from "@/components/dashboard/SlotCard";
+import ConfirmationModal from "@/components/dashboard/ConfirmationModal";
 import {
   getCancellationPolicy,
   getActivePlan,
@@ -218,6 +219,21 @@ function PlanWidget({ plan }: { plan: ActivePlan | null }) {
   );
 }
 
+// ─── Helper: Check if cancellation is allowed (12-hour rule) ──────────
+function canCancelSlot(startTime: string): { allowed: boolean; hoursLeft?: number } {
+  const [hours, minutes] = startTime.split(":").map(Number);
+  const slotStart = new Date();
+  slotStart.setHours(hours, minutes, 0, 0);
+
+  const now = new Date();
+  const hoursDiff = (slotStart.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+  return {
+    allowed: hoursDiff >= 12,
+    hoursLeft: Math.max(0, Math.ceil(hoursDiff)),
+  };
+}
+
 // ─── Student Calendar Page ────────────────────────────────────────────
 export default function StudentCalendar() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -227,6 +243,13 @@ export default function StudentCalendar() {
   const [policy, setPolicy] = useState<CancellationPolicy | null>(null);
   const [plan, setPlan] = useState<ActivePlan | null>(null);
   const { user } = useAuth();
+
+  // Modal state
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalAction, setModalAction] = useState<"book" | "cancel">("book");
+  const [modalLoading, setModalLoading] = useState(false);
+  const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
+  const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
 
   const weekDays = buildWeekDays(weekStart);
 
@@ -254,59 +277,122 @@ export default function StudentCalendar() {
     setSelectedDayIdx(0);
   };
 
-  const handleBook = useCallback(async (slotId: string) => {
-    // Update local state immediately for UI feedback
-    setSlots((prev) =>
-      prev.map((s) =>
-        s.id === slotId ? { ...s, userBooked: true, booked: s.booked + 1 } : s
-      )
-    );
-    setPlan((p) => (p ? { ...p, sessionsUsed: p.sessionsUsed + 1 } : p));
+  // Handle book action - show confirmation modal
+  const handleBookClick = useCallback((slotId: string) => {
+    const slot = slots.find((s) => s.id === slotId);
+    if (!slot) return;
 
-    // Persist to Supabase if user is authenticated
-    if (user) {
-      const result = await createBooking(user.id, slotId);
-      if (!result.success) {
-        toast.error(`Error al agendar sesión: ${result.error}`);
-        // Revert on error
+    // Check capacity
+    if (slot.booked >= slot.capacity) {
+      toast.error("No hay cupos disponibles en esta sesión.");
+      return;
+    }
+
+    setSelectedSlotId(slotId);
+    setSelectedSlot(slot);
+    setModalAction("book");
+    setModalOpen(true);
+  }, [slots]);
+
+  // Handle cancel action - check 12-hour rule and show confirmation modal
+  const handleCancelClick = useCallback((slotId: string) => {
+    const slot = slots.find((s) => s.id === slotId);
+    if (!slot) return;
+
+    const { allowed, hoursLeft } = canCancelSlot(slot.startTime);
+
+    if (!allowed) {
+      toast.error(
+        `No puedes cancelar con menos de 12 horas de anticipación. ` +
+          `Quedan ${hoursLeft} horas para la sesión.`
+      );
+      return;
+    }
+
+    setSelectedSlotId(slotId);
+    setSelectedSlot(slot);
+    setModalAction("cancel");
+    setModalOpen(true);
+  }, [slots]);
+
+  // Confirm booking
+  const handleConfirmBook = async () => {
+    if (!selectedSlotId || !user) return;
+
+    setModalLoading(true);
+    try {
+      const result = await createBooking(user.id, selectedSlotId);
+
+      if (result.success) {
+        // Update local state
         setSlots((prev) =>
           prev.map((s) =>
-            s.id === slotId ? { ...s, userBooked: false, booked: Math.max(0, s.booked - 1) } : s
+            s.id === selectedSlotId
+              ? { ...s, userBooked: true, booked: s.booked + 1 }
+              : s
+          )
+        );
+        setPlan((p) => (p ? { ...p, sessionsUsed: p.sessionsUsed + 1 } : p));
+
+        toast.success(
+          `Sesión ${selectedSlot?.startTime} a ${selectedSlot?.endTime} agendada correctamente.`
+        );
+        setModalOpen(false);
+      } else {
+        toast.error(`Error al agendar: ${result.error}`);
+      }
+    } catch (error) {
+      toast.error("Error inesperado al agendar sesión.");
+      console.error(error);
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  // Confirm cancellation
+  const handleConfirmCancel = async () => {
+    if (!selectedSlotId || !user) return;
+
+    setModalLoading(true);
+    try {
+      const result = await cancelBooking(user.id, selectedSlotId);
+
+      if (result.success) {
+        // Update local state
+        setSlots((prev) =>
+          prev.map((s) =>
+            s.id === selectedSlotId
+              ? { ...s, userBooked: false, booked: Math.max(0, s.booked - 1) }
+              : s
           )
         );
         setPlan((p) =>
           p ? { ...p, sessionsUsed: Math.max(0, p.sessionsUsed - 1) } : p
         );
-      }
-    }
-  }, [user]);
 
-  const handleCancel = useCallback(async (slotId: string) => {
-    // Update local state immediately for UI feedback
-    setSlots((prev) =>
-      prev.map((s) =>
-        s.id === slotId ? { ...s, userBooked: false, booked: Math.max(0, s.booked - 1) } : s
-      )
-    );
-    setPlan((p) =>
-      p ? { ...p, sessionsUsed: Math.max(0, p.sessionsUsed - 1) } : p
-    );
-
-    // Persist to Supabase if user is authenticated
-    if (user) {
-      const result = await cancelBooking(user.id, slotId);
-      if (!result.success) {
-        toast.error(`Error al cancelar sesión: ${result.error}`);
-        // Revert on error
-        setSlots((prev) =>
-          prev.map((s) =>
-            s.id === slotId ? { ...s, userBooked: true, booked: s.booked + 1 } : s
-          )
+        toast.success(
+          `Sesión ${selectedSlot?.startTime} a ${selectedSlot?.endTime} cancelada.`
         );
-        setPlan((p) => (p ? { ...p, sessionsUsed: p.sessionsUsed + 1 } : p));
+        setModalOpen(false);
+      } else {
+        toast.error(`Error al cancelar: ${result.error}`);
       }
+    } catch (error) {
+      toast.error("Error inesperado al cancelar sesión.");
+      console.error(error);
+    } finally {
+      setModalLoading(false);
     }
-  }, [user]);
+  };
+
+  // Close modal
+  const handleModalClose = () => {
+    if (!modalLoading) {
+      setModalOpen(false);
+      setSelectedSlotId(null);
+      setSelectedSlot(null);
+    }
+  };
 
   return (
     <div className="flex h-screen bg-[#05050A] text-white overflow-hidden">
@@ -411,8 +497,8 @@ export default function StudentCalendar() {
                     <SlotCard
                       key={slot.id}
                       slot={slot}
-                      onBook={handleBook}
-                      onCancel={handleCancel}
+                      onBook={handleBookClick}
+                      onCancel={handleCancelClick}
                     />
                   ))}
                 </div>
@@ -421,6 +507,30 @@ export default function StudentCalendar() {
           </div>
         </main>
       </div>
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={modalOpen}
+        title={
+          modalAction === "book"
+            ? "Confirmar Agendamiento"
+            : "Confirmar Cancelación"
+        }
+        message={
+          modalAction === "book"
+            ? `¿Deseas agendar la sesión de ${selectedSlot?.startTime} a ${selectedSlot?.endTime}?`
+            : `¿Estás seguro de que deseas cancelar la sesión de ${selectedSlot?.startTime} a ${selectedSlot?.endTime}? No podrás recuperar el cupo.`
+        }
+        confirmLabel={modalAction === "book" ? "Agendar Sesión" : "Cancelar Sesión"}
+        cancelLabel="Volver"
+        isDangerous={modalAction === "cancel"}
+        isLoading={modalLoading}
+        icon={modalAction === "book" ? "info" : "warning"}
+        onConfirm={
+          modalAction === "book" ? handleConfirmBook : handleConfirmCancel
+        }
+        onCancel={handleModalClose}
+      />
     </div>
   );
 }

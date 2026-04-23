@@ -1,5 +1,4 @@
-import { Clock } from "lucide-react";
-import { toast } from "sonner";
+import { Clock, AlertCircle, Lock } from "lucide-react";
 
 export interface TimeSlot {
   id: string;
@@ -14,6 +13,21 @@ interface SlotCardProps {
   slot: TimeSlot;
   onBook: (slotId: string) => void;
   onCancel: (slotId: string) => void;
+}
+
+// Helper: Check if cancellation is allowed (12-hour rule)
+function canCancelSlot(startTime: string): { allowed: boolean; hoursLeft?: number } {
+  const [hours, minutes] = startTime.split(":").map(Number);
+  const slotStart = new Date();
+  slotStart.setHours(hours, minutes, 0, 0);
+
+  const now = new Date();
+  const hoursDiff = (slotStart.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+  return {
+    allowed: hoursDiff >= 12,
+    hoursLeft: Math.max(0, Math.ceil(hoursDiff)),
+  };
 }
 
 function ProgressBar({ booked, capacity }: { booked: number; capacity: number }) {
@@ -39,6 +53,7 @@ export default function SlotCard({ slot, onBook, onCancel }: SlotCardProps) {
   const { id, startTime, endTime, capacity, booked, userBooked } = slot;
   const isFull = booked >= capacity;
   const available = !isFull && !userBooked;
+  const { allowed: canCancel, hoursLeft } = canCancelSlot(startTime);
 
   const cuposColor = userBooked
     ? "text-[#00d4ff]"
@@ -47,16 +62,6 @@ export default function SlotCard({ slot, onBook, onCancel }: SlotCardProps) {
     : booked === 0
     ? "text-[#00d4ff]"
     : "text-amber-400";
-
-  const handleBook = () => {
-    onBook(id);
-    toast.success(`Sesión ${startTime} a ${endTime} agendada.`);
-  };
-
-  const handleCancel = () => {
-    onCancel(id);
-    toast("Sesión cancelada.");
-  };
 
   return (
     <div
@@ -88,18 +93,37 @@ export default function SlotCard({ slot, onBook, onCancel }: SlotCardProps) {
       {/* Progress bar */}
       <ProgressBar booked={booked} capacity={capacity} />
 
-      {/* Action button */}
-      {userBooked && (
+      {/* 12-hour cancellation rule warning */}
+      {userBooked && !canCancel && (
+        <div className="mt-1 flex items-start gap-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+          <AlertCircle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
+          <p className="text-amber-300 text-[10px] font-inter leading-tight">
+            Cancelación no permitida. Menos de 12 horas para la sesión.
+          </p>
+        </div>
+      )}
+
+      {/* Action buttons */}
+      {userBooked && canCancel && (
         <button
-          onClick={handleCancel}
+          onClick={() => onCancel(id)}
           className="mt-1 w-full py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold font-lexend tracking-wide uppercase hover:bg-red-500/20 transition"
         >
           Cancelar Sesión
         </button>
       )}
+      {userBooked && !canCancel && (
+        <button
+          disabled
+          className="mt-1 w-full py-1.5 rounded-lg bg-gray-500/10 border border-gray-500/20 text-gray-500 text-xs font-bold font-lexend tracking-wide uppercase opacity-50 cursor-not-allowed flex items-center justify-center gap-2"
+        >
+          <Lock className="w-3 h-3" />
+          No se puede cancelar
+        </button>
+      )}
       {available && (
         <button
-          onClick={handleBook}
+          onClick={() => onBook(id)}
           className="mt-1 w-full py-1.5 rounded-lg bg-[#00d4ff] text-[#05050A] text-xs font-bold font-lexend tracking-wide uppercase hover:bg-cyan-300 transition shadow-[0_0_8px_rgba(0,212,255,0.3)]"
         >
           Agendar Sesión
