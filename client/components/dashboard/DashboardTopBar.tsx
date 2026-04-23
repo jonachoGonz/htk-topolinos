@@ -1,0 +1,60 @@
+import { Bell, UserCircle, Menu } from "lucide-react";
+import { useState } from "react";
+
+interface DashboardTopBarProps {
+  onMenuToggle: () => void;
+}
+
+const tabs = ["Dashboard", "Calendario", "Usuarios"];
+
+export default function DashboardTopBar({ onMenuToggle }: DashboardTopBarProps) {
+  const [activeTab, setActiveTab] = useState("Dashboard");
+
+  return (
+    <header className="sticky top-0 z-10 bg-[#0a0e1a]/90 backdrop-blur-md border-b border-white/[0.06] px-5 py-3 flex items-center justify-between gap-4">
+      {/* Left: hamburger (mobile) + title + tabs */}
+      <div className="flex items-center gap-4 min-w-0">
+        <button
+          onClick={onMenuToggle}
+          className="lg:hidden text-gray-400 hover:text-white transition flex-shrink-0"
+          aria-label="Toggle menu"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+
+        {/* Title */}
+        <span className="text-sm font-medium font-lexend whitespace-nowrap">
+          <span className="text-white">HTK Center - </span>
+          <span className="text-[#00d4ff]">Plataformar Profesor</span>
+        </span>
+
+        {/* Nav tabs */}
+        <nav className="hidden md:flex items-center gap-1 ml-2">
+          {tabs.map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-3 py-1.5 text-sm font-medium font-lexend rounded transition-all ${
+                activeTab === tab
+                  ? "text-[#00d4ff] border-b-2 border-[#00d4ff] rounded-none"
+                  : "text-gray-400 hover:text-white"
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      {/* Right: icons */}
+      <div className="flex items-center gap-1 flex-shrink-0">
+        <button className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white transition rounded-lg hover:bg-white/5">
+          <Bell className="w-[18px] h-[18px]" />
+        </button>
+        <button className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white transition rounded-lg hover:bg-white/5">
+          <UserCircle className="w-[18px] h-[18px]" />
+        </button>
+      </div>
+    </header>
+  );
+}
