@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Mail, Lock, User, KeyRound, ArrowRight, LogIn, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { loginTeacher, loginStudent } from "@/services/supabase";
+import { useAuth } from "@/contexts/AuthContext";
 import Navigation from "@/components/htk/Navigation";
 import LoginFooter from "@/components/htk/LoginFooter";
 
@@ -41,6 +42,7 @@ function TeacherCard() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const navigate = useNavigate();
+  const { userRole } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,7 +52,14 @@ function TeacherCard() {
       const result = await loginTeacher(email, password);
       if (result.success) {
         toast.success("¡Bienvenido, Profesor!");
-        navigate("/dashboard/teacher");
+        // Redirect based on role from Supabase
+        setTimeout(() => {
+          if (userRole === "teacher") {
+            navigate("/dashboard");
+          } else {
+            navigate("/dashboard/teacher");
+          }
+        }, 500);
       } else {
         setError(result.error ?? "Error al iniciar sesión.");
       }
@@ -128,6 +137,7 @@ function StudentCard() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const navigate = useNavigate();
+  const { userRole } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -137,7 +147,14 @@ function StudentCard() {
       const result = await loginStudent(identity, password);
       if (result.success) {
         toast.success("¡Bienvenido al Portal!");
-        navigate("/dashboard/student");
+        // Redirect based on role from Supabase
+        setTimeout(() => {
+          if (userRole === "student") {
+            navigate("/dashboard/student/calendar");
+          } else {
+            navigate("/dashboard/student");
+          }
+        }, 500);
       } else {
         setError(result.error ?? "Error al iniciar sesión.");
       }

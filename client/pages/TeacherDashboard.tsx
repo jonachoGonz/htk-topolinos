@@ -1,6 +1,8 @@
 import { useState, useMemo } from "react";
 import { TrendingUp, AlertTriangle, CalendarClock, Search, ListChecks, Plus, Save } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
+import { upsertAttendance } from "@/services/supabase";
 import Sidebar from "@/components/dashboard/Sidebar";
 import DashboardTopBar from "@/components/dashboard/DashboardTopBar";
 import UserRow, { type AttendanceStatus, type Patient } from "@/components/dashboard/UserRow";
@@ -102,6 +104,7 @@ export default function TeacherDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [patients, setPatients] = useState<Patient[]>(INITIAL_PATIENTS);
   const [search, setSearch] = useState("");
+  const { user } = useAuth();
 
   const filteredPatients = useMemo(() => {
     const q = search.toLowerCase();
@@ -116,10 +119,19 @@ export default function TeacherDashboard() {
   const confirmedCount = patients.filter((p) => p.status === "confirmed").length;
   const absentAlerts = patients.filter((p) => p.status === "absent" || p.alert).length;
 
-  const handleStatusChange = (id: string, status: AttendanceStatus) => {
+  const handleStatusChange = async (id: string, status: AttendanceStatus) => {
+    // Update local state immediately for UI feedback
     setPatients((prev) =>
       prev.map((p) => (p.id === id ? { ...p, status } : p))
     );
+
+    // Persist to Supabase if user is authenticated
+    if (user) {
+      const result = await upsertAttendance(user.id, id, status);
+      if (!result.success) {
+        toast.error(`Error al guardar asistencia: ${result.error}`);
+      }
+    }
   };
 
   const handleDismiss = (id: string) => {
@@ -127,8 +139,13 @@ export default function TeacherDashboard() {
     toast("Paciente removido de la sesión.");
   };
 
-  const handleSaveDraft = () => toast.success("Borrador guardado correctamente.");
-  const handleFinish = () => toast.success("Sesión finalizada. ¡Hasta pronto!");
+  const handleSaveDraft = () => {
+    toast.success("Borrador guardado correctamente.");
+  };
+
+  const handleFinish = () => {
+    toast.success("Sesión finalizada. ¡Hasta pronto!");
+  };
 
   return (
     <div className="flex h-screen bg-[#05050A] text-white overflow-hidden">

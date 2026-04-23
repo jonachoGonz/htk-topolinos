@@ -9,6 +9,9 @@ import {
   UserCircle,
   Menu,
 } from "lucide-react";
+import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
+import { createBooking, cancelBooking } from "@/services/supabase";
 import Sidebar from "@/components/dashboard/Sidebar";
 import SlotCard, { type TimeSlot } from "@/components/dashboard/SlotCard";
 import {
@@ -223,6 +226,7 @@ export default function StudentCalendar() {
   const [slots, setSlots] = useState<TimeSlot[]>([]);
   const [policy, setPolicy] = useState<CancellationPolicy | null>(null);
   const [plan, setPlan] = useState<ActivePlan | null>(null);
+  const { user } = useAuth();
 
   const weekDays = buildWeekDays(weekStart);
 
@@ -250,16 +254,35 @@ export default function StudentCalendar() {
     setSelectedDayIdx(0);
   };
 
-  const handleBook = useCallback((slotId: string) => {
+  const handleBook = useCallback(async (slotId: string) => {
+    // Update local state immediately for UI feedback
     setSlots((prev) =>
       prev.map((s) =>
         s.id === slotId ? { ...s, userBooked: true, booked: s.booked + 1 } : s
       )
     );
     setPlan((p) => (p ? { ...p, sessionsUsed: p.sessionsUsed + 1 } : p));
-  }, []);
 
-  const handleCancel = useCallback((slotId: string) => {
+    // Persist to Supabase if user is authenticated
+    if (user) {
+      const result = await createBooking(user.id, slotId);
+      if (!result.success) {
+        toast.error(`Error al agendar sesión: ${result.error}`);
+        // Revert on error
+        setSlots((prev) =>
+          prev.map((s) =>
+            s.id === slotId ? { ...s, userBooked: false, booked: Math.max(0, s.booked - 1) } : s
+          )
+        );
+        setPlan((p) =>
+          p ? { ...p, sessionsUsed: Math.max(0, p.sessionsUsed - 1) } : p
+        );
+      }
+    }
+  }, [user]);
+
+  const handleCancel = useCallback(async (slotId: string) => {
+    // Update local state immediately for UI feedback
     setSlots((prev) =>
       prev.map((s) =>
         s.id === slotId ? { ...s, userBooked: false, booked: Math.max(0, s.booked - 1) } : s
@@ -268,7 +291,22 @@ export default function StudentCalendar() {
     setPlan((p) =>
       p ? { ...p, sessionsUsed: Math.max(0, p.sessionsUsed - 1) } : p
     );
-  }, []);
+
+    // Persist to Supabase if user is authenticated
+    if (user) {
+      const result = await cancelBooking(user.id, slotId);
+      if (!result.success) {
+        toast.error(`Error al cancelar sesión: ${result.error}`);
+        // Revert on error
+        setSlots((prev) =>
+          prev.map((s) =>
+            s.id === slotId ? { ...s, userBooked: true, booked: s.booked + 1 } : s
+          )
+        );
+        setPlan((p) => (p ? { ...p, sessionsUsed: p.sessionsUsed + 1 } : p));
+      }
+    }
+  }, [user]);
 
   return (
     <div className="flex h-screen bg-[#05050A] text-white overflow-hidden">
