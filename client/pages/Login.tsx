@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Mail, Lock, User, KeyRound, ArrowRight, LogIn, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
@@ -41,8 +41,6 @@ function TeacherCard() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const navigate = useNavigate();
-  const { userRole } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,20 +50,13 @@ function TeacherCard() {
       const result = await loginTeacher(email, password);
       if (result.success) {
         toast.success("¡Bienvenido, Profesor!");
-        // Redirect based on role from Supabase
-        setTimeout(() => {
-          if (userRole === "teacher") {
-            navigate("/dashboard");
-          } else {
-            navigate("/dashboard/teacher");
-          }
-        }, 500);
+        // Navigation is handled by Login's useEffect watching user/userRole
       } else {
         setError(result.error ?? "Error al iniciar sesión.");
+        setLoading(false);
       }
     } catch {
       setError("Error inesperado. Intenta nuevamente.");
-    } finally {
       setLoading(false);
     }
   };
@@ -136,8 +127,6 @@ function StudentCard() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const navigate = useNavigate();
-  const { userRole } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -147,20 +136,13 @@ function StudentCard() {
       const result = await loginStudent(identity, password);
       if (result.success) {
         toast.success("¡Bienvenido al Portal!");
-        // Redirect based on role from Supabase
-        setTimeout(() => {
-          if (userRole === "student") {
-            navigate("/dashboard/student/calendar");
-          } else {
-            navigate("/dashboard/student");
-          }
-        }, 500);
+        // Navigation is handled by Login's useEffect watching user/userRole
       } else {
         setError(result.error ?? "Error al iniciar sesión.");
+        setLoading(false);
       }
     } catch {
       setError("Error inesperado. Intenta nuevamente.");
-    } finally {
       setLoading(false);
     }
   };
@@ -226,6 +208,18 @@ function StudentCard() {
 
 // ─── Login Page ───────────────────────────────────────────────────────
 export default function Login() {
+  const navigate = useNavigate();
+  const { user, userRole } = useAuth();
+
+  // Redirect once auth context reflects the new session
+  useEffect(() => {
+    if (user && userRole === "teacher") {
+      navigate("/dashboard", { replace: true });
+    } else if (user && userRole === "student") {
+      navigate("/dashboard/student", { replace: true });
+    }
+  }, [user, userRole, navigate]);
+
   return (
     <div className="min-h-screen bg-[#0a0f1a] text-white font-lexend flex flex-col">
       <Navigation />
