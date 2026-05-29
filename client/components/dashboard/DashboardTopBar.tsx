@@ -1,15 +1,22 @@
 import { Bell, UserCircle, Menu } from "lucide-react";
-import { useState } from "react";
 
 interface DashboardTopBarProps {
   onMenuToggle: () => void;
+  activeTab?: string;
+  onTabChange?: (tab: string) => void;
 }
 
-const tabs = ["Dashboard", "Calendario", "Usuarios"];
+const tabLabels = {
+  dashboard: "Dashboard",
+  calendar: "Calendario",
+  patients: "Pacientes",
+  profile: "Mi Perfil",
+  admin: "Admin",
+};
 
-export default function DashboardTopBar({ onMenuToggle }: DashboardTopBarProps) {
-  const [activeTab, setActiveTab] = useState("Dashboard");
+const visibleTabs = ["dashboard", "calendar", "patients", "profile"];
 
+export default function DashboardTopBar({ onMenuToggle, activeTab = "dashboard", onTabChange }: DashboardTopBarProps) {
   return (
     <header className="sticky top-0 z-10 bg-[#0a0e1a]/90 backdrop-blur-md border-b border-white/[0.06] px-5 py-3 flex items-center justify-between gap-4">
       {/* Left: hamburger (mobile) + title + tabs */}
@@ -25,22 +32,22 @@ export default function DashboardTopBar({ onMenuToggle }: DashboardTopBarProps) 
         {/* Title */}
         <span className="text-sm font-medium font-lexend whitespace-nowrap">
           <span className="text-white">HTK Center - </span>
-          <span className="text-[#00d4ff]">Plataformar Profesor</span>
+          <span className="text-[#00d4ff]">Plataforma Profesor</span>
         </span>
 
         {/* Nav tabs */}
         <nav className="hidden md:flex items-center gap-1 ml-2">
-          {tabs.map((tab) => (
+          {visibleTabs.map((tab) => (
             <button
               key={tab}
-              onClick={() => setActiveTab(tab)}
+              onClick={() => onTabChange?.(tab)}
               className={`px-3 py-1.5 text-sm font-medium font-lexend rounded transition-all ${
                 activeTab === tab
                   ? "text-[#00d4ff] border-b-2 border-[#00d4ff] rounded-none"
                   : "text-gray-400 hover:text-white"
               }`}
             >
-              {tab}
+              {tabLabels[tab as keyof typeof tabLabels]}
             </button>
           ))}
         </nav>

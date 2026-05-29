@@ -47,6 +47,38 @@ export interface BookingRecord {
   cancelled_at?: string;
 }
 
+export interface Availability {
+  id: string;
+  professional_id: string;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+  max_capacity: number;
+  is_holiday: boolean;
+  created_at: string;
+}
+
+export interface Plan {
+  id: string;
+  student_id: string;
+  name: string;
+  total_sessions: number;
+  remaining_sessions: number;
+  expiry_date: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface ProgressRecord {
+  id: string;
+  patient_id: string;
+  professional_id: string;
+  record_date: string;
+  notes: string;
+  metrics?: Record<string, any>;
+  created_at: string;
+}
+
 /**
  * Login teacher with email + password.
  */
@@ -212,6 +244,204 @@ export async function cancelBooking(
       .eq("user_id", userId)
       .eq("slot_id", slotId)
       .is("cancelled_at", null);
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+}
+
+/**
+ * Get availability slots for a professional
+ */
+export async function getAvailability(
+  professionalId: string
+): Promise<{ success: boolean; data?: Availability[]; error?: string }> {
+  try {
+    const { data, error } = await supabase
+      .from("availability")
+      .select("*")
+      .eq("professional_id", professionalId)
+      .order("day_of_week", { ascending: true })
+      .order("start_time", { ascending: true });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, data: data || [] };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+}
+
+/**
+ * Create availability slot
+ */
+export async function createAvailability(
+  professionalId: string,
+  dayOfWeek: number,
+  startTime: string,
+  endTime: string,
+  maxCapacity: number
+): Promise<{ success: boolean; error?: string }> {
+  if (dayOfWeek < 0 || dayOfWeek > 6) {
+    return { success: false, error: "Día inválido (0-6)" };
+  }
+  if (!startTime || !endTime) {
+    return { success: false, error: "Por favor completa los horarios" };
+  }
+  if (maxCapacity < 1) {
+    return { success: false, error: "Capacidad debe ser al menos 1" };
+  }
+
+  try {
+    const { error } = await supabase.from("availability").insert({
+      professional_id: professionalId,
+      day_of_week: dayOfWeek,
+      start_time: startTime,
+      end_time: endTime,
+      max_capacity: maxCapacity,
+      is_holiday: false,
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+}
+
+/**
+ * Delete availability slot
+ */
+export async function deleteAvailability(
+  id: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { error } = await supabase
+      .from("availability")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+}
+
+/**
+ * Get bookings for a professional or student
+ */
+export async function getBookings(
+  type: "professional" | "student",
+  userId: string
+): Promise<{ success: boolean; data?: any[]; error?: string }> {
+  try {
+    let query = supabase.from("bookings").select("*");
+
+    if (type === "professional") {
+      query = query.eq("professional_id", userId);
+    } else {
+      query = query.eq("student_id", userId);
+    }
+
+    const { data, error } = await query.order("booking_date", {
+      ascending: false,
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, data: data || [] };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+}
+
+/**
+ * Get progress records for a patient
+ */
+export async function getProgressRecords(
+  patientId: string
+): Promise<{ success: boolean; data?: ProgressRecord[]; error?: string }> {
+  try {
+    const { data, error } = await supabase
+      .from("progress_records")
+      .select("*")
+      .eq("patient_id", patientId)
+      .order("record_date", { ascending: false });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, data: data || [] };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+}
+
+/**
+ * Create a progress record
+ */
+export async function createProgressRecord(
+  patientId: string,
+  professionalId: string,
+  notes: string,
+  metrics?: Record<string, any>
+): Promise<{ success: boolean; error?: string }> {
+  if (!notes) {
+    return { success: false, error: "Las notas son requeridas" };
+  }
+
+  try {
+    const { error } = await supabase.from("progress_records").insert({
+      patient_id: patientId,
+      professional_id: professionalId,
+      record_date: new Date().toISOString(),
+      notes,
+      metrics: metrics || {},
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+}
+
+/**
+ * Update user profile
+ */
+export async function updateProfile(
+  userId: string,
+  updates: Partial<{
+    full_name: string;
+    phone: string;
+    specialization: string;
+  }>
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { error } = await supabase
+      .from("profiles")
+      .update(updates)
+      .eq("id", userId);
 
     if (error) {
       return { success: false, error: error.message };
