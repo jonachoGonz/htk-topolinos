@@ -7,10 +7,12 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+import ProtectedRoute from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Booking from "./pages/Booking";
 import Login from "./pages/Login";
 import TeacherDashboard from "./pages/TeacherDashboard";
+import StudentDashboard from "./pages/StudentDashboard";
 import StudentCalendar from "./pages/StudentCalendar";
 import NotFound from "./pages/NotFound";
 
@@ -27,10 +29,38 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/booking" element={<Booking />} />
             <Route path="/login" element={<Login />} />
-            <Route path="/dashboard" element={<TeacherDashboard />} />
-            <Route path="/dashboard/teacher" element={<TeacherDashboard />} />
-            <Route path="/dashboard/student" element={<StudentCalendar />} />
-            <Route path="/dashboard/student/calendar" element={<StudentCalendar />} />
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute requiredRole="teacher">
+                  <TeacherDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/teacher"
+              element={
+                <ProtectedRoute requiredRole="teacher">
+                  <TeacherDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/student"
+              element={
+                <ProtectedRoute requiredRole="student">
+                  <StudentDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/student/calendar"
+              element={
+                <ProtectedRoute requiredRole="student">
+                  <StudentCalendar />
+                </ProtectedRoute>
+              }
+            />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
