@@ -7,11 +7,11 @@ interface DashboardTopBarProps {
 }
 
 const tabLabels = {
-  dashboard: "Dashboard",
+  dashboard: "Panel",
   calendar: "Calendario",
   patients: "Pacientes",
   profile: "Mi Perfil",
-  admin: "Admin",
+  admin: "Administración",
 };
 
 const visibleTabs = ["dashboard", "calendar", "patients", "profile"];

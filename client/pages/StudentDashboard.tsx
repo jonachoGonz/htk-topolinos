@@ -22,7 +22,13 @@ export default function StudentDashboard() {
   return (
     <div className="flex h-screen bg-[#05050A] text-white overflow-hidden">
       {/* Sidebar */}
-      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} userRole="student" />
+      <Sidebar
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        userRole="student"
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+      />
 
       {/* Main content column */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden lg:ml-0">

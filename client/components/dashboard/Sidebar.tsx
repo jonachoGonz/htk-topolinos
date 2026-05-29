@@ -1,4 +1,5 @@
-import { Link, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   LayoutDashboard,
   CalendarDays,
@@ -6,49 +7,59 @@ import {
   CreditCard,
   Settings,
   LogOut,
-  Plus,
+  UserCircle,
   X,
 } from "lucide-react";
 
 type NavItem = {
   icon: React.ElementType;
   label: string;
-  path: string;
+  tabId: string;
 };
 
 const teacherNavItems: NavItem[] = [
-  { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
-  { icon: CalendarDays, label: "Calendario", path: "/dashboard/calendario" },
-  { icon: Users, label: "Pacientes", path: "/dashboard/pacientes" },
-  { icon: CreditCard, label: "Pagos", path: "/dashboard/pagos" },
-  { icon: Settings, label: "Configuración", path: "/dashboard/configuracion" },
+  { icon: LayoutDashboard, label: "Panel",        tabId: "dashboard" },
+  { icon: CalendarDays,    label: "Calendario",   tabId: "calendar"  },
+  { icon: Users,           label: "Pacientes",    tabId: "patients"  },
+  { icon: UserCircle,      label: "Mi Perfil",    tabId: "profile"   },
 ];
 
 const studentNavItems: NavItem[] = [
-  { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard/student" },
-  { icon: CalendarDays, label: "Calendario", path: "/dashboard/student/calendar" },
-  { icon: CreditCard, label: "Pagos", path: "/dashboard/student/pagos" },
-  { icon: Settings, label: "Configuración", path: "/dashboard/student/configuracion" },
+  { icon: LayoutDashboard, label: "Panel",          tabId: "dashboard"    },
+  { icon: CalendarDays,    label: "Calendario",     tabId: "calendario"   },
+  { icon: CreditCard,      label: "Pagos",          tabId: "pagos"        },
+  { icon: Settings,        label: "Configuración",  tabId: "configuracion"},
 ];
 
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
   userRole?: "teacher" | "student";
+  activeTab?: string;
+  onTabChange?: (tab: string) => void;
 }
 
-export default function Sidebar({ isOpen, onClose, userRole = "teacher" }: SidebarProps) {
-  const location = useLocation();
-  const navItems = userRole === "student" ? studentNavItems : teacherNavItems;
-  const brandSubtext = userRole === "student" ? "ALUMNO" : "ADMIN CENTRAL";
+export default function Sidebar({
+  isOpen,
+  onClose,
+  userRole = "teacher",
+  activeTab = "dashboard",
+  onTabChange,
+}: SidebarProps) {
+  const navigate = useNavigate();
+  const { signOut } = useAuth();
 
-  const isActive = (path: string) => {
-    if (userRole === "teacher") {
-      return path === "/dashboard"
-        ? location.pathname === path || location.pathname === "/dashboard/teacher"
-        : location.pathname.startsWith(path);
-    }
-    return location.pathname === path || location.pathname.startsWith(path);
+  const navItems = userRole === "student" ? studentNavItems : teacherNavItems;
+  const brandSubtext = userRole === "student" ? "PORTAL ALUMNO" : "PORTAL PROFESOR";
+
+  const handleTabClick = (tabId: string) => {
+    onTabChange?.(tabId);
+    onClose(); // cierra el menú en móvil
+  };
+
+  const handleLogout = async () => {
+    await signOut();
+    navigate("/login");
   };
 
   return (
@@ -80,14 +91,18 @@ export default function Sidebar({ isOpen, onClose, userRole = "teacher" }: Sideb
             </div>
             <div>
               <div className="text-white font-bold text-sm font-lexend leading-tight">
-                HTK Panel
+                HTK Center
               </div>
               <div className="text-gray-500 text-[9px] tracking-[0.12em] uppercase font-lexend mt-0.5">
                 {brandSubtext}
               </div>
             </div>
           </div>
-          <button onClick={onClose} className="lg:hidden text-gray-600 hover:text-gray-300 transition">
+          <button
+            onClick={onClose}
+            className="lg:hidden text-gray-600 hover:text-gray-300 transition"
+            aria-label="Cerrar menú"
+          >
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -95,15 +110,15 @@ export default function Sidebar({ isOpen, onClose, userRole = "teacher" }: Sideb
         {/* Navigation */}
         <nav className="flex-1 py-4 overflow-y-auto">
           <div className="px-3 space-y-0.5">
-            {navItems.map(({ icon: Icon, label, path }) => {
-              const active = isActive(path);
+            {navItems.map(({ icon: Icon, label, tabId }) => {
+              const active = activeTab === tabId;
               return (
-                <Link
-                  key={path}
-                  to={path}
+                <button
+                  key={tabId}
+                  onClick={() => handleTabClick(tabId)}
                   className={`
-                    flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium font-lexend
-                    transition-all duration-150 group relative
+                    w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium font-lexend
+                    transition-all duration-150 group relative text-left
                     ${active
                       ? "text-[#00d4ff] bg-[#00d4ff]/[0.07]"
                       : "text-gray-500 hover:text-gray-200 hover:bg-white/[0.04]"
@@ -113,23 +128,24 @@ export default function Sidebar({ isOpen, onClose, userRole = "teacher" }: Sideb
                   {active && (
                     <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-[#00d4ff] rounded-r-full" />
                   )}
-                  <Icon className={`w-4 h-4 flex-shrink-0 ${active ? "text-[#00d4ff]" : "text-gray-600 group-hover:text-gray-300"}`} />
+                  <Icon
+                    className={`w-4 h-4 flex-shrink-0 ${
+                      active ? "text-[#00d4ff]" : "text-gray-600 group-hover:text-gray-300"
+                    }`}
+                  />
                   {label}
-                </Link>
+                </button>
               );
             })}
           </div>
         </nav>
 
-        {/* Bottom */}
-        <div className="px-4 pb-5 pt-3 border-t border-white/[0.06] space-y-2">
-          {userRole === "teacher" && (
-            <button className="w-full flex items-center justify-center gap-2 bg-[#00d4ff] hover:bg-cyan-300 text-[#05050A] text-sm font-bold py-2.5 rounded-xl transition font-lexend">
-              <Plus className="w-4 h-4" />
-              Nuevo Usuario
-            </button>
-          )}
-          <button className="flex items-center gap-2.5 w-full text-gray-500 hover:text-gray-200 text-sm transition px-2 py-2 rounded-lg hover:bg-white/[0.03] font-lexend">
+        {/* Bottom — logout */}
+        <div className="px-4 pb-5 pt-3 border-t border-white/[0.06]">
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-2.5 w-full text-gray-500 hover:text-rose-400 text-sm transition px-2 py-2 rounded-lg hover:bg-rose-500/[0.06] font-lexend"
+          >
             <LogOut className="w-4 h-4" />
             Cerrar Sesión
           </button>

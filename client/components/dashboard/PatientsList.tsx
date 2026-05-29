@@ -41,7 +41,7 @@ export default function PatientsList({
           id: "s1",
           name: "Ana Martínez",
           email: "ana.martinez@example.com",
-          lastSession: "Hoy 10:30 AM",
+          lastSession: "Hoy 10:30",
           remainingSessions: 8,
         },
         {

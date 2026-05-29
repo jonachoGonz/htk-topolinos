@@ -52,7 +52,7 @@ export default function DashboardSection() {
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-white font-montserrat leading-tight">
-            Dashboard
+            Panel de Control
           </h1>
           <p className="text-gray-400 text-sm font-inter mt-1">
             Resumen de tu actividad
