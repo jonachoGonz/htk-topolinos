@@ -12,6 +12,7 @@ import Index from "./pages/Index";
 import Booking from "./pages/Booking";
 import Login from "./pages/Login";
 import TeacherDashboard from "./pages/TeacherDashboard";
+import StudentDashboard from "./pages/StudentDashboard";
 import StudentCalendar from "./pages/StudentCalendar";
 import NotFound from "./pages/NotFound";
 
@@ -48,7 +49,7 @@ const App = () => (
               path="/dashboard/student"
               element={
                 <ProtectedRoute requiredRole="student">
-                  <StudentCalendar />
+                  <StudentDashboard />
                 </ProtectedRoute>
               }
             />

@@ -454,6 +454,113 @@ export async function updateProfile(
 }
 
 /**
+ * Get student availability (teacher availability slots filtered for student view)
+ */
+export async function getStudentAvailability(
+  studentId: string,
+  weekStart: Date
+): Promise<{ success: boolean; data?: Availability[]; error?: string }> {
+  try {
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 7);
+
+    const { data, error } = await supabase
+      .from("availability")
+      .select("*")
+      .gte("created_at", weekStart.toISOString())
+      .lte("created_at", weekEnd.toISOString())
+      .order("day_of_week", { ascending: true })
+      .order("start_time", { ascending: true });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, data: data || [] };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+}
+
+/**
+ * Get student's active plan
+ */
+export async function getStudentPlan(
+  studentId: string
+): Promise<{ success: boolean; data?: Plan; error?: string }> {
+  try {
+    const { data, error } = await supabase
+      .from("plans")
+      .select("*")
+      .eq("student_id", studentId)
+      .eq("is_active", true)
+      .single();
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, data: data || undefined };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+}
+
+/**
+ * Get student's bookings with optional status filter
+ */
+export async function getStudentBookings(
+  studentId: string,
+  status?: "confirmed" | "cancelled" | "completed"
+): Promise<{ success: boolean; data?: BookingRecord[]; error?: string }> {
+  try {
+    let query = supabase
+      .from("bookings")
+      .select("*")
+      .eq("student_id", studentId);
+
+    if (status) {
+      query = query.eq("status", status);
+    }
+
+    const { data, error } = await query.order("booking_date", {
+      ascending: false,
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, data: data || [] };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+}
+
+/**
+ * Get student's plan history (past and current plans)
+ */
+export async function getPlanHistory(
+  studentId: string
+): Promise<{ success: boolean; data?: Plan[]; error?: string }> {
+  try {
+    const { data, error } = await supabase
+      .from("plans")
+      .select("*")
+      .eq("student_id", studentId)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, data: data || [] };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+}
+
+/**
  * Sign out the current user
  */
 export async function logout(): Promise<void> {
