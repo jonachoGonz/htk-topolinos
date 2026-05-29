@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git pull *)",
+      "Bash(git checkout *)",
+      "Bash(git push *)",
+      "Bash(npm run *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git commit *)",
+      "Bash(ls /Users/jonachoGonz/.nvm/versions/node/ 2>/dev/null || echo \"nvm path not found\")",
+      "Bash(nvm use *)",
+      "Bash(curl -s http://localhost:5173)"
+    ]
+  }
+}

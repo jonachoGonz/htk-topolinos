@@ -1,6 +1,6 @@
 import { Bell, UserCircle, Menu } from "lucide-react";
 
-interface DashboardTopBarProps {
+interface StudentTopBarProps {
   onMenuToggle: () => void;
   activeTab?: string;
   onTabChange?: (tab: string) => void;
@@ -8,15 +8,18 @@ interface DashboardTopBarProps {
 
 const tabLabels = {
   dashboard: "Dashboard",
-  calendar: "Calendario",
-  patients: "Pacientes",
-  profile: "Mi Perfil",
-  admin: "Admin",
+  calendario: "Calendario",
+  pagos: "Pagos",
+  configuracion: "Configuración",
 };
 
-const visibleTabs = ["dashboard", "calendar", "patients", "profile"];
+const visibleTabs = ["dashboard", "calendario", "pagos", "configuracion"];
 
-export default function DashboardTopBar({ onMenuToggle, activeTab = "dashboard", onTabChange }: DashboardTopBarProps) {
+export default function StudentTopBar({
+  onMenuToggle,
+  activeTab = "dashboard",
+  onTabChange,
+}: StudentTopBarProps) {
   return (
     <header className="sticky top-0 z-10 bg-[#0a0e1a]/90 backdrop-blur-md border-b border-white/[0.06] px-5 py-3 flex items-center justify-between gap-4">
       {/* Left: hamburger (mobile) + title + tabs */}
@@ -32,7 +35,7 @@ export default function DashboardTopBar({ onMenuToggle, activeTab = "dashboard",
         {/* Title */}
         <span className="text-sm font-medium font-lexend whitespace-nowrap">
           <span className="text-white">HTK Center - </span>
-          <span className="text-[#00d4ff]">Plataforma Profesor</span>
+          <span className="text-[#00d4ff]">Plataforma Estudiante</span>
         </span>
 
         {/* Nav tabs */}
