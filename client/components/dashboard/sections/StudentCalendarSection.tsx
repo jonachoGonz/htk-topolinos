@@ -64,7 +64,7 @@ function formatWeekRange(weekStart: Date): string {
 }
 
 function buildWeekDays(weekStart: Date) {
-  return Array.from({ length: 6 }, (_, i) => {
+  return Array.from({ length: 7 }, (_, i) => {
     const d = new Date(weekStart);
     d.setDate(d.getDate() + i);
     return d;
@@ -129,47 +129,52 @@ export default function StudentCalendarSection({
     if (!studentId) return;
     setIsLoading(true);
 
-    // Fetch availability for the week
+    // 1. Traer todos los slots de disponibilidad (recurrentes por día de semana)
     const availResult = await getStudentAvailability(studentId, weekStart);
     if (availResult.success && availResult.data) {
-      // Filter to selected day and build TimeSlot objects
       const selectedDate = weekDays[selectedDayIdx];
-      const dayOfWeek = selectedDate.getDay();
+      // JS getDay(): 0=Dom,1=Lun...6=Sáb — la DB usa 0=Lun,1=Mar...6=Dom
+      // Mapeamos: JS 0 (Dom)→6, JS 1 (Lun)→0, ... JS 6 (Sáb)→5
+      const jsDay = selectedDate.getDay();
+      const dbDayOfWeek = jsDay === 0 ? 6 : jsDay - 1;
 
       const dayAvailabilities = availResult.data.filter(
-        (a) => a.day_of_week === dayOfWeek
+        (a) => a.day_of_week === dbDayOfWeek
       );
 
-      const builtSlots: TimeSlot[] = dayAvailabilities.flatMap((avail) =>
-        SLOT_TIMES.map((time, idx) => ({
-          id: `${avail.id}-${idx}`,
-          startTime: time.start,
-          endTime: time.end,
-          capacity: avail.max_capacity,
-          booked: 0,
-          userBooked: false,
-        }))
-      );
+      // 2. Cada slot = 1 registro de disponibilidad, incluyendo professionalId
+      const builtSlots: TimeSlot[] = dayAvailabilities.map((avail) => ({
+        id: avail.id,
+        startTime: avail.start_time.slice(0, 5),   // "HH:MM"
+        endTime: avail.end_time.slice(0, 5),
+        capacity: avail.max_capacity,
+        booked: 0,
+        userBooked: false,
+        professionalId: avail.professional_id,      // embebido para el booking
+      }));
 
-      // Fetch bookings and mark which ones are booked by user
-      const bookingResult = await getStudentBookings(studentId);
+      // 4. Verificar reservas existentes del alumno para este día
+      const bookingResult = await getStudentBookings(studentId, "confirmed");
+
       if (bookingResult.success && bookingResult.data) {
         setBookings(bookingResult.data);
+        const selectedDateStr = selectedDate.toISOString().split("T")[0];
 
         const builtSlotsWithBookings = builtSlots.map((slot) => {
-          const isUserBooked = bookingResult.data?.some(
+          const isUserBooked = bookingResult.data!.some(
             (b) =>
-              b.slot_id === slot.id &&
-              (!b.cancelled_at ||
-                new Date(b.cancelled_at) > new Date(selectedDate))
+              b.booking_date === selectedDateStr &&
+              b.start_time.slice(0, 5) === slot.startTime
           );
-          return { ...slot, userBooked: isUserBooked ?? false };
+          return { ...slot, userBooked: isUserBooked };
         });
 
         setSlots(builtSlotsWithBookings);
       } else {
         setSlots(builtSlots);
       }
+    } else {
+      setSlots([]);
     }
 
     setIsLoading(false);
@@ -231,11 +236,26 @@ export default function StudentCalendarSection({
   );
 
   const handleConfirmBook = async () => {
-    if (!selectedSlotId || !user?.id) return;
+    if (!selectedSlotId || !user?.id || !selectedSlot) return;
+
+    const professionalId = selectedSlot.professionalId;
+    if (!professionalId) {
+      toast.error("No se encontró el profesional del horario.");
+      return;
+    }
+
+    const selectedDate = weekDays[selectedDayIdx];
+    const bookingDate = selectedDate.toISOString().split("T")[0]; // YYYY-MM-DD
 
     setModalLoading(true);
     try {
-      const result = await createBooking(user.id, selectedSlotId);
+      const result = await createBooking(
+        user.id,
+        professionalId,
+        bookingDate,
+        selectedSlot.startTime,
+        selectedSlot.endTime
+      );
 
       if (result.success) {
         setSlots((prev) =>
@@ -245,7 +265,6 @@ export default function StudentCalendarSection({
               : s
           )
         );
-
         toast.success(
           `Sesión ${selectedSlot?.startTime} a ${selectedSlot?.endTime} agendada correctamente.`
         );
@@ -253,7 +272,7 @@ export default function StudentCalendarSection({
       } else {
         toast.error(`Error al agendar: ${result.error}`);
       }
-    } catch (error) {
+    } catch {
       toast.error("Error inesperado al agendar sesión.");
     } finally {
       setModalLoading(false);
@@ -261,11 +280,18 @@ export default function StudentCalendarSection({
   };
 
   const handleConfirmCancel = async () => {
-    if (!selectedSlotId || !user?.id) return;
+    if (!selectedSlotId || !user?.id || !selectedSlot) return;
+
+    const selectedDate = weekDays[selectedDayIdx];
+    const bookingDate = selectedDate.toISOString().split("T")[0];
 
     setModalLoading(true);
     try {
-      const result = await cancelBooking(user.id, selectedSlotId);
+      const result = await cancelBooking(
+        user.id,
+        bookingDate,
+        selectedSlot.startTime
+      );
 
       if (result.success) {
         setSlots((prev) =>
@@ -275,7 +301,6 @@ export default function StudentCalendarSection({
               : s
           )
         );
-
         toast.success(
           `Sesión ${selectedSlot?.startTime} a ${selectedSlot?.endTime} cancelada.`
         );
@@ -283,7 +308,7 @@ export default function StudentCalendarSection({
       } else {
         toast.error(`Error al cancelar: ${result.error}`);
       }
-    } catch (error) {
+    } catch {
       toast.error("Error inesperado al cancelar sesión.");
     } finally {
       setModalLoading(false);

@@ -117,7 +117,7 @@ export default function PatientsList({
                           onViewProgress?.(patient.id) ||
                           toast("Ver progreso: " + patient.name)
                         }
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 text-blue-400 hover:bg-blue-500/10 rounded transition text-xs"
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 text-blue-400 hover:bg-blue-500/10 rounded transition text-xs whitespace-nowrap"
                       >
                         <Eye className="w-3.5 h-3.5" />
                         Ver
@@ -127,7 +127,7 @@ export default function PatientsList({
                           onAddNote?.(patient.id) ||
                           toast("Agregar nota: " + patient.name)
                         }
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 text-emerald-400 hover:bg-emerald-500/10 rounded transition text-xs"
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 text-emerald-400 hover:bg-emerald-500/10 rounded transition text-xs whitespace-nowrap"
                       >
                         <Plus className="w-3.5 h-3.5" />
                         Nota

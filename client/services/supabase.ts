@@ -41,10 +41,15 @@ export interface AttendanceRecord {
 
 export interface BookingRecord {
   id: string;
-  user_id: string;
-  slot_id: string;
-  booked_at: string;
+  student_id: string;
+  professional_id: string;
+  booking_date: string;   // YYYY-MM-DD
+  start_time: string;     // HH:MM:SS
+  end_time: string;       // HH:MM:SS
+  status: "confirmed" | "cancelled" | "completed";
+  notes?: string;
   cancelled_at?: string;
+  created_at: string;
 }
 
 export interface Availability {
@@ -177,17 +182,23 @@ export async function upsertAttendance(
 }
 
 /**
- * Create booking record
+ * Create booking record — usa el schema real de la tabla bookings
  */
 export async function createBooking(
-  userId: string,
-  slotId: string
+  studentId: string,
+  professionalId: string,
+  bookingDate: string,   // YYYY-MM-DD
+  startTime: string,     // HH:MM
+  endTime: string        // HH:MM
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const { error } = await supabase.from("bookings").insert({
-      user_id: userId,
-      slot_id: slotId,
-      booked_at: new Date().toISOString(),
+      student_id: studentId,
+      professional_id: professionalId,
+      booking_date: bookingDate,
+      start_time: startTime,
+      end_time: endTime,
+      status: "confirmed",
     });
 
     if (error) {
@@ -201,19 +212,24 @@ export async function createBooking(
 }
 
 /**
- * Cancel booking record
+ * Cancel booking record — actualiza status a 'cancelled'
  */
 export async function cancelBooking(
-  userId: string,
-  slotId: string
+  studentId: string,
+  bookingDate: string,
+  startTime: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const { error } = await supabase
       .from("bookings")
-      .update({ cancelled_at: new Date().toISOString() })
-      .eq("user_id", userId)
-      .eq("slot_id", slotId)
-      .is("cancelled_at", null);
+      .update({
+        status: "cancelled",
+        cancelled_at: new Date().toISOString(),
+      })
+      .eq("student_id", studentId)
+      .eq("booking_date", bookingDate)
+      .eq("start_time", startTime)
+      .eq("status", "confirmed");
 
     if (error) {
       return { success: false, error: error.message };
@@ -427,18 +443,16 @@ export async function updateProfile(
  * Get student availability (teacher availability slots filtered for student view)
  */
 export async function getStudentAvailability(
-  studentId: string,
-  weekStart: Date
+  _studentId: string,
+  _weekStart: Date
 ): Promise<{ success: boolean; data?: Availability[]; error?: string }> {
   try {
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekEnd.getDate() + 7);
-
+    // La disponibilidad es recurrente semanal (día_de_semana + hora).
+    // No filtramos por created_at sino que traemos todos los slots activos.
     const { data, error } = await supabase
       .from("availability")
       .select("*")
-      .gte("created_at", weekStart.toISOString())
-      .lte("created_at", weekEnd.toISOString())
+      .eq("is_holiday", false)
       .order("day_of_week", { ascending: true })
       .order("start_time", { ascending: true });
 

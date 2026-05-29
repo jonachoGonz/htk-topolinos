@@ -121,30 +121,34 @@ export default function AvailabilityManager({
           {/* Start Time */}
           <div className="flex flex-col gap-2">
             <label className="text-xs font-inter text-gray-400 uppercase">
-              Hora Inicio
+              Hora Inicio (HH:MM)
             </label>
             <input
-              type="time"
+              type="text"
+              placeholder="09:00"
+              pattern="^([01]\d|2[0-3]):[0-5]\d$"
               value={formData.startTime}
               onChange={(e) =>
                 setFormData({ ...formData, startTime: e.target.value })
               }
-              className="bg-[#0a0e1a] border border-white/10 rounded-lg px-3 py-2 text-sm text-white font-inter focus:outline-none focus:border-[#00d4ff]/40"
+              className="bg-[#0a0e1a] border border-white/10 rounded-lg px-3 py-2 text-sm text-white font-inter focus:outline-none focus:border-[#00d4ff]/40 placeholder-gray-600"
             />
           </div>
 
           {/* End Time */}
           <div className="flex flex-col gap-2">
             <label className="text-xs font-inter text-gray-400 uppercase">
-              Hora Fin
+              Hora Fin (HH:MM)
             </label>
             <input
-              type="time"
+              type="text"
+              placeholder="10:30"
+              pattern="^([01]\d|2[0-3]):[0-5]\d$"
               value={formData.endTime}
               onChange={(e) =>
                 setFormData({ ...formData, endTime: e.target.value })
               }
-              className="bg-[#0a0e1a] border border-white/10 rounded-lg px-3 py-2 text-sm text-white font-inter focus:outline-none focus:border-[#00d4ff]/40"
+              className="bg-[#0a0e1a] border border-white/10 rounded-lg px-3 py-2 text-sm text-white font-inter focus:outline-none focus:border-[#00d4ff]/40 placeholder-gray-600"
             />
           </div>
 
