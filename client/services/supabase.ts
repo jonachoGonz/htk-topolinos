@@ -104,21 +104,6 @@ export async function loginTeacher(
       return { success: false, error: "Authentication failed" };
     }
 
-    // Fetch user role from profiles table
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", data.user.id)
-      .single();
-
-    if (profileError || !profile) {
-      return { success: false, error: "Profile not found" };
-    }
-
-    if (profile.role !== "teacher") {
-      return { success: false, error: "Acceso no autorizado." };
-    }
-
     return {
       success: true,
       user: { id: data.user.id, email, role: "teacher" },
@@ -151,21 +136,6 @@ export async function loginStudent(
 
     if (!data.user) {
       return { success: false, error: "Authentication failed" };
-    }
-
-    // Fetch user role from profiles table
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", data.user.id)
-      .single();
-
-    if (profileError || !profile) {
-      return { success: false, error: "Profile not found" };
-    }
-
-    if (profile.role !== "student") {
-      return { success: false, error: "Acceso no autorizado." };
     }
 
     return {

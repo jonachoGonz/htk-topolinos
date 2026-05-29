@@ -19,55 +19,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<"teacher" | "student" | null>(null);
 
-  // Initialize auth state from Supabase session
   useEffect(() => {
-    const initAuth = async () => {
-      try {
-        // Get initial session
-        const { data } = await supabase.auth.getSession();
-        setSession(data.session);
-        setUser(data.session?.user ?? null);
-
-        // Fetch user role from profiles table if user exists
-        if (data.session?.user) {
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("role")
-            .eq("id", data.session.user.id)
-            .single();
-
-          if (profile) {
-            setUserRole(profile.role as "teacher" | "student");
-          }
-        }
-      } catch (error) {
-        console.error("Auth initialization error:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    initAuth();
-
-    // Subscribe to auth state changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+    } = supabase.auth.onAuthStateChange((event, newSession) => {
       setSession(newSession);
       setUser(newSession?.user ?? null);
 
       if (newSession?.user) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", newSession.user.id)
-          .single();
+        // Defer DB call outside the auth lock to prevent deadlock in Supabase JS v2
+        setTimeout(async () => {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("role")
+            .eq("id", newSession.user.id)
+            .single();
 
-        if (profile) {
-          setUserRole(profile.role as "teacher" | "student");
-        }
+          setUserRole(profile ? (profile.role as "teacher" | "student") : null);
+          setLoading(false);
+        }, 0);
       } else {
         setUserRole(null);
+        setLoading(false);
       }
     });
 
@@ -88,17 +61,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (data.user) {
-        // Fetch user role
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", data.user.id)
-          .single();
-
-        if (profile) {
-          setUserRole(profile.role as "teacher" | "student");
-        }
-
         return { success: true };
       }
 
