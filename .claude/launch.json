@@ -5,7 +5,7 @@
       "name": "dev",
       "runtimeExecutable": "bash",
       "runtimeArgs": ["-c", "export PATH=\"/Users/jonachoGonz/.nvm/versions/node/v20.18.1/bin:$PATH\" && npm run dev"],
-      "port": 5173
+      "port": 8080
     }
   ]
 }

@@ -100,7 +100,7 @@ export default function StudentDashboardSection() {
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-white font-montserrat leading-tight">
-            Mi Dashboard
+            Mi Panel
           </h1>
           <p className="text-gray-400 text-sm font-inter mt-1">
             Resumen de tu actividad y plan actual
@@ -218,7 +218,7 @@ export default function StudentDashboardSection() {
                 <div>
                   <p className="text-white font-medium">{booking.booked_at}</p>
                   <p className="text-gray-400 text-sm font-inter mt-1">
-                    Estado: <span className="text-emerald-400">{booking.status}</span>
+                    Estado: <span className="text-emerald-400">Confirmada</span>
                   </p>
                 </div>
               </div>

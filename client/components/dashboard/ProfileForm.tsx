@@ -2,22 +2,42 @@ import { useState, useEffect } from "react";
 import { Save } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
-import { updateProfile } from "@/services/supabase";
+import { updateProfile, supabase } from "@/services/supabase";
 
 export default function ProfileForm() {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [isFetching, setIsFetching] = useState(true);
   const [formData, setFormData] = useState({
     fullName: "",
     phone: "",
     specialization: "",
   });
 
+  // Usar user?.id (primitivo estable) para evitar el bucle infinito
   useEffect(() => {
-    // In a real app, fetch user profile data here
-    // For now, using empty defaults
-    console.log("User profile loaded:", user?.id);
-  }, [user]);
+    if (!user?.id) return;
+
+    const fetchProfile = async () => {
+      setIsFetching(true);
+      const { data } = await supabase
+        .from("profiles")
+        .select("full_name, phone, specialization")
+        .eq("id", user.id)
+        .single();
+
+      if (data) {
+        setFormData({
+          fullName: data.full_name || "",
+          phone: data.phone || "",
+          specialization: data.specialization || "",
+        });
+      }
+      setIsFetching(false);
+    };
+
+    fetchProfile();
+  }, [user?.id]);
 
   const handleChange = (field: string, value: string) => {
     setFormData({ ...formData, [field]: value });

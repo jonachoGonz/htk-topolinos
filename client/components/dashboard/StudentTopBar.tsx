@@ -7,7 +7,7 @@ interface StudentTopBarProps {
 }
 
 const tabLabels = {
-  dashboard: "Dashboard",
+  dashboard: "Panel",
   calendario: "Calendario",
   pagos: "Pagos",
   configuracion: "Configuración",
