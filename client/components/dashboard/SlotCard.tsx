@@ -7,6 +7,7 @@ export interface TimeSlot {
   capacity: number;
   booked: number;
   userBooked: boolean;
+  professionalId?: string; // ID del profesional — necesario para crear el booking
 }
 
 interface SlotCardProps {
