@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Trash2, Plus } from "lucide-react";
+import { Trash2, Plus, Edit2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   getAvailability,
@@ -7,6 +7,7 @@ import {
   deleteAvailability,
   type Availability,
 } from "@/services/supabase";
+import EditAvailabilityModal from "./EditAvailabilityModal";
 
 interface AvailabilityManagerProps {
   professionalId: string;
@@ -28,6 +29,8 @@ export default function AvailabilityManager({
   const [availabilities, setAvailabilities] = useState<Availability[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [selectedAvailability, setSelectedAvailability] =
+    useState<Availability | null>(null);
   const [formData, setFormData] = useState({
     dayOfWeek: "0",
     startTime: "09:00",
@@ -225,13 +228,22 @@ export default function AvailabilityManager({
                     <td className="px-6 py-3 text-gray-400">{av.end_time}</td>
                     <td className="px-6 py-3">{av.max_capacity} personas</td>
                     <td className="px-6 py-3">
-                      <button
-                        onClick={() => handleDelete(av.id)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-red-400 hover:bg-red-500/10 rounded transition text-sm"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        Eliminar
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setSelectedAvailability(av)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-blue-400 hover:bg-blue-500/10 rounded transition text-sm"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => handleDelete(av.id)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-red-400 hover:bg-red-500/10 rounded transition text-sm"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Eliminar
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -240,6 +252,15 @@ export default function AvailabilityManager({
           </div>
         )}
       </div>
+
+      {/* Edit Modal */}
+      {selectedAvailability && (
+        <EditAvailabilityModal
+          availability={selectedAvailability}
+          onClose={() => setSelectedAvailability(null)}
+          onSuccess={fetchAvailabilities}
+        />
+      )}
     </div>
   );
 }
