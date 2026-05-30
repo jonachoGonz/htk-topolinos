@@ -1,5 +1,6 @@
 import "./global.css";
 
+import { Suspense, lazy } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { createRoot, Root } from "react-dom/client";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -9,12 +10,20 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
-import Booking from "./pages/Booking";
 import Login from "./pages/Login";
-import TeacherDashboard from "./pages/TeacherDashboard";
-import StudentDashboard from "./pages/StudentDashboard";
-import StudentCalendar from "./pages/StudentCalendar";
 import NotFound from "./pages/NotFound";
+
+// Lazy load heavy pages
+const Booking = lazy(() => import("./pages/Booking"));
+const TeacherDashboard = lazy(() => import("./pages/TeacherDashboard"));
+const StudentDashboard = lazy(() => import("./pages/StudentDashboard"));
+const StudentCalendar = lazy(() => import("./pages/StudentCalendar"));
+
+const LoadingFallback = () => (
+  <div className="flex items-center justify-center h-screen">
+    <p className="text-gray-500">Cargando...</p>
+  </div>
+);
 
 const queryClient = new QueryClient();
 
@@ -27,13 +36,22 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
-            <Route path="/booking" element={<Booking />} />
+            <Route
+              path="/booking"
+              element={
+                <Suspense fallback={<LoadingFallback />}>
+                  <Booking />
+                </Suspense>
+              }
+            />
             <Route path="/login" element={<Login />} />
             <Route
               path="/dashboard"
               element={
                 <ProtectedRoute requiredRole="teacher">
-                  <TeacherDashboard />
+                  <Suspense fallback={<LoadingFallback />}>
+                    <TeacherDashboard />
+                  </Suspense>
                 </ProtectedRoute>
               }
             />
@@ -41,7 +59,9 @@ const App = () => (
               path="/dashboard/teacher"
               element={
                 <ProtectedRoute requiredRole="teacher">
-                  <TeacherDashboard />
+                  <Suspense fallback={<LoadingFallback />}>
+                    <TeacherDashboard />
+                  </Suspense>
                 </ProtectedRoute>
               }
             />
@@ -49,7 +69,9 @@ const App = () => (
               path="/dashboard/student"
               element={
                 <ProtectedRoute requiredRole="student">
-                  <StudentDashboard />
+                  <Suspense fallback={<LoadingFallback />}>
+                    <StudentDashboard />
+                  </Suspense>
                 </ProtectedRoute>
               }
             />
@@ -57,11 +79,12 @@ const App = () => (
               path="/dashboard/student/calendar"
               element={
                 <ProtectedRoute requiredRole="student">
-                  <StudentCalendar />
+                  <Suspense fallback={<LoadingFallback />}>
+                    <StudentCalendar />
+                  </Suspense>
                 </ProtectedRoute>
               }
             />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
