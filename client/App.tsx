@@ -1,6 +1,7 @@
 import "./global.css";
 
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useEffect } from "react";
+import { registerServiceWorker } from "@/hooks/useOfflineMode";
 import { Toaster } from "@/components/ui/toaster";
 import { createRoot, Root } from "react-dom/client";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -27,7 +28,13 @@ const LoadingFallback = () => (
 
 const queryClient = new QueryClient();
 
-const App = () => (
+const App = () => {
+  // Register service worker for PWA support
+  useEffect(() => {
+    registerServiceWorker();
+  }, []);
+
+  return (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <TooltipProvider>
@@ -91,7 +98,8 @@ const App = () => (
       </TooltipProvider>
     </AuthProvider>
   </QueryClientProvider>
-);
+  );
+};
 
 // Store root reference in window for HMR support
 declare global {
