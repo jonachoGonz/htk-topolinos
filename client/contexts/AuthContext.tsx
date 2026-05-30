@@ -7,6 +7,7 @@ export interface AuthContextType {
   session: Session | null;
   loading: boolean;
   userRole: "teacher" | "student" | null;
+  isAdmin: boolean;
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
 }
@@ -18,6 +19,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<"teacher" | "student" | null>(null);
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
 
   useEffect(() => {
     const {
@@ -31,15 +33,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setTimeout(async () => {
           const { data: profile } = await supabase
             .from("profiles")
-            .select("role")
+            .select("role, is_admin")
             .eq("id", newSession.user.id)
             .single();
 
           setUserRole(profile ? (profile.role as "teacher" | "student") : null);
+          setIsAdmin(!!profile?.is_admin);
           setLoading(false);
         }, 0);
       } else {
         setUserRole(null);
+        setIsAdmin(false);
         setLoading(false);
       }
     });
@@ -76,13 +80,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
       setSession(null);
       setUserRole(null);
+      setIsAdmin(false);
     } catch (error) {
       console.error("Sign out error:", error);
     }
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, userRole, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, userRole, isAdmin, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );

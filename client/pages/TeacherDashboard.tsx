@@ -13,7 +13,7 @@ import AdminSection from "@/components/dashboard/sections/AdminSection";
 export default function TeacherDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("dashboard");
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
 
   const handleNewUser = () => {
     toast("Crear nuevo usuario");
@@ -25,6 +25,7 @@ export default function TeacherDashboard() {
       <Sidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
+        userRole="teacher"
         activeTab={activeTab}
         onTabChange={setActiveTab}
       />
@@ -40,7 +41,7 @@ export default function TeacherDashboard() {
           {activeTab === "calendar" && <CalendarSection professionalId={user?.id || ""} />}
           {activeTab === "patients" && <PatientsSection professionalId={user?.id || ""} />}
           {activeTab === "profile" && <ProfileSection />}
-          {activeTab === "admin" && user?.is_admin && <AdminSection />}
+          {activeTab === "admin" && isAdmin && <AdminSection />}
         </main>
       </div>
 

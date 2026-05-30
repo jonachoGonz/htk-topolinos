@@ -8,6 +8,7 @@ import {
   Settings,
   LogOut,
   UserCircle,
+  Shield,
   X,
 } from "lucide-react";
 
@@ -23,6 +24,10 @@ const teacherNavItems: NavItem[] = [
   { icon: Users,           label: "Pacientes",    tabId: "patients"  },
   { icon: UserCircle,      label: "Mi Perfil",    tabId: "profile"   },
 ];
+
+const adminNavItem: NavItem = {
+  icon: Shield, label: "Administración", tabId: "admin",
+};
 
 const studentNavItems: NavItem[] = [
   { icon: LayoutDashboard, label: "Panel",          tabId: "dashboard"    },
@@ -47,10 +52,16 @@ export default function Sidebar({
   onTabChange,
 }: SidebarProps) {
   const navigate = useNavigate();
-  const { signOut } = useAuth();
+  const { signOut, isAdmin } = useAuth();
 
-  const navItems = userRole === "student" ? studentNavItems : teacherNavItems;
-  const brandSubtext = userRole === "student" ? "PORTAL ALUMNO" : "PORTAL PROFESOR";
+  const baseItems = userRole === "student" ? studentNavItems : teacherNavItems;
+  const navItems =
+    userRole !== "student" && isAdmin ? [...baseItems, adminNavItem] : baseItems;
+  const brandSubtext = userRole === "student"
+    ? "PORTAL ALUMNO"
+    : isAdmin
+    ? "PORTAL ADMIN"
+    : "PORTAL PROFESOR";
 
   const handleTabClick = (tabId: string) => {
     onTabChange?.(tabId);

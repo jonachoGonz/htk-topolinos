@@ -876,7 +876,7 @@ export async function getAllProfessionals(
   try {
     let query = supabase
       .from("profiles")
-      .select("id, full_name, email, specialization, professional_type")
+      .select("id, full_name, specialization, professional_type")
       .eq("role", "teacher");
 
     if (filterType) {
@@ -908,7 +908,7 @@ export async function getBookingsForSlot(
         id, student_id, booking_date, start_time, end_time, status,
         attended, attendance_confirmed_at, charged_from_plan, charged_at,
         professional_type,
-        student:profiles!bookings_student_id_fkey(id, full_name, email)
+        student:profiles!bookings_student_id_fkey(id, full_name)
         `
       )
       .eq("professional_id", professionalId)
@@ -1062,6 +1062,243 @@ export function canCancelBooking(
     allowed: hoursDiff >= minHoursAdvance,
     hoursLeft: Math.max(0, Math.ceil(hoursDiff)),
   };
+}
+
+// ============================================
+// PLAN TEMPLATES (ADMIN)
+// ============================================
+
+export type RenewalPeriod = "monthly" | "trimestral" | "semestral" | "anual";
+export type SessionType = "terapia" | "kinesiologia" | "nutricional" | "otra";
+
+export interface PlanTemplate {
+  id: string;
+  professional_id?: string;
+  name: string;
+  description?: string;
+  description_rich?: string;
+  monthly_classes: number;
+  sessions_per_month?: number;
+  allowed_renewals: RenewalPeriod[];
+  prices: {
+    monthly: number;
+    trimestral: number;
+    semestral: number;
+    anual: number;
+  };
+  accepts_discount_codes: boolean;
+  discount_code?: string | null;
+  includes_sessions: boolean;
+  session_count_monthly: number;
+  session_type?: SessionType | null;
+  is_active: boolean;
+  is_default: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export async function getPlanTemplates(
+  includeInactive = false
+): Promise<{ success: boolean; data?: PlanTemplate[]; error?: string }> {
+  try {
+    let query = supabase.from("plan_templates").select("*");
+    if (!includeInactive) query = query.eq("is_active", true);
+    const { data, error } = await query.order("created_at", { ascending: false });
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: data || [] };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+}
+
+export async function createPlanTemplate(
+  payload: Omit<PlanTemplate, "id" | "created_at" | "updated_at">
+): Promise<{ success: boolean; data?: PlanTemplate; error?: string }> {
+  try {
+    // Map to DB columns (sessions_per_month is legacy required column)
+    const row: any = {
+      name: payload.name,
+      description: payload.description ?? null,
+      description_rich: payload.description_rich ?? null,
+      monthly_classes: payload.monthly_classes,
+      sessions_per_month: payload.monthly_classes, // mirror for legacy
+      allowed_renewals: payload.allowed_renewals,
+      prices: payload.prices,
+      price_per_month: payload.prices.monthly, // legacy column
+      accepts_discount_codes: payload.accepts_discount_codes,
+      discount_code: payload.accepts_discount_codes ? payload.discount_code : null,
+      includes_sessions: payload.includes_sessions,
+      session_count_monthly: payload.includes_sessions ? payload.session_count_monthly : 0,
+      session_type: payload.includes_sessions ? payload.session_type : null,
+      is_active: payload.is_active,
+      is_default: payload.is_default,
+      professional_id: payload.professional_id ?? null,
+    };
+
+    const { data, error } = await supabase
+      .from("plan_templates")
+      .insert(row)
+      .select("*")
+      .single();
+
+    if (error) return { success: false, error: error.message };
+    return { success: true, data };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+}
+
+export async function updatePlanTemplate(
+  id: string,
+  updates: Partial<Omit<PlanTemplate, "id" | "created_at">>
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const row: any = { ...updates, updated_at: new Date().toISOString() };
+    if (typeof updates.monthly_classes === "number") {
+      row.sessions_per_month = updates.monthly_classes;
+    }
+    if (updates.prices && typeof updates.prices.monthly === "number") {
+      row.price_per_month = updates.prices.monthly;
+    }
+    if (updates.accepts_discount_codes === false) {
+      row.discount_code = null;
+    }
+    if (updates.includes_sessions === false) {
+      row.session_count_monthly = 0;
+      row.session_type = null;
+    }
+
+    const { error } = await supabase
+      .from("plan_templates")
+      .update(row)
+      .eq("id", id);
+
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+}
+
+export async function deletePlanTemplate(
+  id: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Soft-delete: mark inactive instead of hard delete (preserves history)
+    const { error } = await supabase
+      .from("plan_templates")
+      .update({ is_active: false, updated_at: new Date().toISOString() })
+      .eq("id", id);
+
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+}
+
+export async function setDefaultPlanTemplate(
+  id: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Unset existing default
+    await supabase
+      .from("plan_templates")
+      .update({ is_default: false })
+      .eq("is_default", true);
+
+    // Set new default
+    const { error } = await supabase
+      .from("plan_templates")
+      .update({ is_default: true })
+      .eq("id", id);
+
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+}
+
+// ============================================
+// ADMIN PLAN ASSIGNMENT
+// ============================================
+
+export async function getStudents(): Promise<{
+  success: boolean;
+  data?: Array<{ id: string; full_name: string; email?: string }>;
+  error?: string;
+}> {
+  try {
+    // profiles table doesn't have email; email lives in auth.users (not directly queryable from client).
+    // Return id + full_name; email can be fetched separately via admin RPC if needed.
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, full_name")
+      .eq("role", "student")
+      .order("full_name", { ascending: true });
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: data || [] };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+}
+
+export async function assignPlanToStudent(
+  studentId: string,
+  planTemplateId: string,
+  durationMonths: number = 1
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Try RPC first
+    const { data: rpcData, error: rpcError } = await supabase.rpc("admin_assign_plan_to_student", {
+      p_student_id: studentId,
+      p_plan_template_id: planTemplateId,
+      p_duration_months: durationMonths,
+    });
+
+    if (!rpcError && rpcData?.success) {
+      return { success: true };
+    }
+
+    // Fallback client-side
+    const { data: template, error: tplErr } = await supabase
+      .from("plan_templates")
+      .select("name, monthly_classes")
+      .eq("id", planTemplateId)
+      .single();
+
+    if (tplErr || !template) {
+      return { success: false, error: tplErr?.message || "Template not found" };
+    }
+
+    // Deactivate existing
+    await supabase
+      .from("plans")
+      .update({ is_active: false })
+      .eq("student_id", studentId)
+      .eq("is_active", true);
+
+    // Insert new
+    const totalSessions = template.monthly_classes * durationMonths;
+    const expiry = new Date();
+    expiry.setMonth(expiry.getMonth() + durationMonths);
+
+    const { error: insErr } = await supabase.from("plans").insert({
+      student_id: studentId,
+      name: template.name,
+      total_sessions: totalSessions,
+      remaining_sessions: totalSessions,
+      monthly_class_count: template.monthly_classes,
+      expiry_date: expiry.toISOString().split("T")[0],
+      is_active: true,
+    });
+
+    if (insErr) return { success: false, error: insErr.message };
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
 }
 
 /**
