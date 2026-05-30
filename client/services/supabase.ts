@@ -328,6 +328,47 @@ export async function deleteAvailability(
 }
 
 /**
+ * Update availability slot
+ */
+export async function updateAvailability(
+  id: string,
+  dayOfWeek: number,
+  startTime: string,
+  endTime: string,
+  maxCapacity: number
+): Promise<{ success: boolean; error?: string }> {
+  if (dayOfWeek < 0 || dayOfWeek > 6) {
+    return { success: false, error: "Día inválido (0-6)" };
+  }
+  if (!startTime || !endTime) {
+    return { success: false, error: "Por favor completa los horarios" };
+  }
+  if (maxCapacity < 1) {
+    return { success: false, error: "Capacidad debe ser al menos 1" };
+  }
+
+  try {
+    const { error } = await supabase
+      .from("availability")
+      .update({
+        day_of_week: dayOfWeek,
+        start_time: startTime,
+        end_time: endTime,
+        max_capacity: maxCapacity,
+      })
+      .eq("id", id);
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+}
+
+/**
  * Get bookings for a professional or student
  */
 export async function getBookings(
