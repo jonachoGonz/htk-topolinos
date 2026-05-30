@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
-import { ChevronLeft, ChevronRight, Clock } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { ChevronLeft, ChevronRight, Clock, User, CreditCard, Apple } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -7,7 +7,13 @@ import {
   getStudentBookings,
   createBooking,
   cancelBooking,
+  getAllProfessionals,
+  getRemainingPlanClasses,
+  isSlotInPast,
+  canCancelBooking,
   type BookingRecord,
+  type ProfessionalProfile,
+  type ProfessionalType,
 } from "@/services/supabase";
 import SlotCard, { type TimeSlot } from "@/components/dashboard/SlotCard";
 import ConfirmationModal from "@/components/dashboard/ConfirmationModal";
@@ -27,30 +33,8 @@ const DAY_NAMES_FULL = [
   "Sábado",
 ];
 const MONTH_NAMES = [
-  "Enero",
-  "Febrero",
-  "Marzo",
-  "Abril",
-  "Mayo",
-  "Junio",
-  "Julio",
-  "Agosto",
-  "Septiembre",
-  "Octubre",
-  "Noviembre",
-  "Diciembre",
-];
-
-const SLOT_TIMES = [
-  { start: "07:00", end: "08:30" },
-  { start: "08:30", end: "10:00" },
-  { start: "10:00", end: "11:30" },
-  { start: "11:30", end: "13:00" },
-  { start: "15:00", end: "16:30" },
-  { start: "16:30", end: "18:00" },
-  { start: "18:00", end: "19:30" },
-  { start: "19:30", end: "21:00" },
-  { start: "21:00", end: "22:30" },
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
 
 function formatWeekRange(weekStart: Date): string {
@@ -71,42 +55,53 @@ function buildWeekDays(weekStart: Date) {
   });
 }
 
-function canCancelSlot(startTime: string): {
-  allowed: boolean;
-  hoursLeft?: number;
-} {
-  const [hours, minutes] = startTime.split(":").map(Number);
-  const slotStart = new Date();
-  slotStart.setHours(hours, minutes, 0, 0);
-
-  const now = new Date();
-  const hoursDiff = (slotStart.getTime() - now.getTime()) / (1000 * 60 * 60);
-
-  return {
-    allowed: hoursDiff >= 12,
-    hoursLeft: Math.max(0, Math.ceil(hoursDiff)),
-  };
+/**
+ * Get the Sunday of the current week — using the user's local timezone.
+ * Note: The "week start" is Sunday for display purposes.
+ */
+function getCurrentWeekStart(): Date {
+  const today = new Date();
+  const day = today.getDay(); // 0=Sun..6=Sat
+  const d = new Date(today);
+  d.setDate(today.getDate() - day);
+  d.setHours(0, 0, 0, 0);
+  return d;
 }
 
-function getWeekStart(): Date {
-  const today = new Date();
-  const day = today.getDay();
-  const diff = today.getDate() - day;
-  return new Date(today.setDate(diff));
+function isSameDay(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+interface StudentCalendarSectionProps {
+  studentId: string;
 }
 
 export default function StudentCalendarSection({
   studentId,
-}: {
-  studentId: string;
-}) {
-  const [weekStart, setWeekStart] = useState(getWeekStart());
-  const [selectedDayIdx, setSelectedDayIdx] = useState(0);
+}: StudentCalendarSectionProps) {
+  // Initialize on TODAY's week, selecting TODAY as the active day
+  const [weekStart, setWeekStart] = useState(getCurrentWeekStart());
+  const [selectedDayIdx, setSelectedDayIdx] = useState(() => new Date().getDay());
+
   const [slots, setSlots] = useState<TimeSlot[]>([]);
   const [policy, setPolicy] = useState<CancellationPolicy | null>(null);
-  const [bookings, setBookings] = useState<BookingRecord[]>([]);
+  const [_bookings, setBookings] = useState<BookingRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Plan tracking
+  const [planRemaining, setPlanRemaining] = useState<number>(0);
+  const [planTotal, setPlanTotal] = useState<number>(4);
+
+  // Professional selector (filter)
+  const [professionals, setProfessionals] = useState<ProfessionalProfile[]>([]);
+  const [selectedProfessionalId, setSelectedProfessionalId] = useState<string>("all");
+  const [selectedType, setSelectedType] = useState<ProfessionalType | "all">("all");
+
+  // Modal state
   const [modalOpen, setModalOpen] = useState(false);
   const [modalAction, setModalAction] = useState<"book" | "cancel">("book");
   const [modalLoading, setModalLoading] = useState(false);
@@ -115,47 +110,81 @@ export default function StudentCalendarSection({
 
   const { user } = useAuth();
   const weekDays = buildWeekDays(weekStart);
+  const today = useMemo(() => new Date(), []);
+
+  // Cancellation policy hours (from Contentful or default 12)
+  const minCancelHours = policy?.hoursNotice ?? 12;
 
   useEffect(() => {
-    getCancellationPolicy().then(setPolicy);
+    getCancellationPolicy().then(setPolicy).catch(() => setPolicy(null));
   }, []);
+
+  // Load professionals once
+  useEffect(() => {
+    getAllProfessionals().then((res) => {
+      if (res.success) setProfessionals(res.data || []);
+    });
+  }, []);
+
+  // Refresh plan counts whenever student changes
+  useEffect(() => {
+    if (!studentId) return;
+    getRemainingPlanClasses(studentId).then((res) => {
+      if (res.success) {
+        setPlanRemaining(res.remaining ?? 0);
+        setPlanTotal(res.total ?? 4);
+      }
+    });
+  }, [studentId]);
 
   useEffect(() => {
     if (!studentId) return;
     fetchData();
-  }, [studentId, weekStart, selectedDayIdx]);
+  }, [studentId, weekStart, selectedDayIdx, selectedProfessionalId, selectedType]);
 
   const fetchData = async () => {
     if (!studentId) return;
     setIsLoading(true);
 
-    // 1. Traer todos los slots de disponibilidad (recurrentes por día de semana)
     const availResult = await getStudentAvailability(studentId, weekStart);
     if (availResult.success && availResult.data) {
       const selectedDate = weekDays[selectedDayIdx];
-      // JS getDay(): 0=Dom,1=Lun...6=Sáb — la DB usa 0=Lun,1=Mar...6=Dom
-      // Mapeamos: JS 0 (Dom)→6, JS 1 (Lun)→0, ... JS 6 (Sáb)→5
       const jsDay = selectedDate.getDay();
+      // DB stores day_of_week: 0=Mon..6=Sun. JS getDay: 0=Sun..6=Sat → map.
       const dbDayOfWeek = jsDay === 0 ? 6 : jsDay - 1;
 
-      const dayAvailabilities = availResult.data.filter(
+      let dayAvailabilities = availResult.data.filter(
         (a) => a.day_of_week === dbDayOfWeek
       );
 
-      // 2. Cada slot = 1 registro de disponibilidad, incluyendo professionalId
+      // Filter by selected professional
+      if (selectedProfessionalId !== "all") {
+        dayAvailabilities = dayAvailabilities.filter(
+          (a) => a.professional_id === selectedProfessionalId
+        );
+      }
+      // Filter by professional type
+      if (selectedType !== "all") {
+        dayAvailabilities = dayAvailabilities.filter(
+          (a) => (a.professional_type ?? "kinesiologist") === selectedType
+        );
+      }
+
       const builtSlots: TimeSlot[] = dayAvailabilities.map((avail) => ({
         id: avail.id,
-        startTime: avail.start_time.slice(0, 5),   // "HH:MM"
+        startTime: avail.start_time.slice(0, 5),
         endTime: avail.end_time.slice(0, 5),
         capacity: avail.max_capacity,
         booked: 0,
         userBooked: false,
-        professionalId: avail.professional_id,      // embebido para el booking
+        professionalId: avail.professional_id,
+        professionalType: (avail.professional_type ?? "kinesiologist") as ProfessionalType,
+        bookingDate: new Date(selectedDate),
+        isPast: isSlotInPast(selectedDate, avail.start_time.slice(0, 5)),
       }));
 
-      // 4. Verificar reservas existentes del alumno para este día
+      // Merge with student's existing bookings
       const bookingResult = await getStudentBookings(studentId, "confirmed");
-
       if (bookingResult.success && bookingResult.data) {
         setBookings(bookingResult.data);
         const selectedDateStr = selectedDate.toISOString().split("T")[0];
@@ -164,13 +193,17 @@ export default function StudentCalendarSection({
           const isUserBooked = bookingResult.data!.some(
             (b) =>
               b.booking_date === selectedDateStr &&
-              b.start_time.slice(0, 5) === slot.startTime
+              b.start_time.slice(0, 5) === slot.startTime &&
+              b.professional_id === slot.professionalId
           );
           return { ...slot, userBooked: isUserBooked };
         });
 
+        // Sort slots by start time
+        builtSlotsWithBookings.sort((a, b) => a.startTime.localeCompare(b.startTime));
         setSlots(builtSlotsWithBookings);
       } else {
+        builtSlots.sort((a, b) => a.startTime.localeCompare(b.startTime));
         setSlots(builtSlots);
       }
     } else {
@@ -194,13 +227,33 @@ export default function StudentCalendarSection({
     setSelectedDayIdx(0);
   };
 
+  const goToToday = () => {
+    setWeekStart(getCurrentWeekStart());
+    setSelectedDayIdx(new Date().getDay());
+  };
+
   const handleBookClick = useCallback(
     (slotId: string) => {
       const slot = slots.find((s) => s.id === slotId);
       if (!slot) return;
 
+      if (slot.isPast) {
+        toast.error("No puedes agendar un horario que ya pasó.");
+        return;
+      }
       if (slot.booked >= slot.capacity) {
         toast.error("No hay cupos disponibles en esta sesión.");
+        return;
+      }
+
+      // For kinesiologist/therapist: check plan
+      const consumesPlan =
+        slot.professionalType !== "nutritionist";
+
+      if (consumesPlan && planRemaining <= 0) {
+        toast.error(
+          "No tienes clases disponibles en tu plan. Renueva o adquiere un nuevo plan."
+        );
         return;
       }
 
@@ -209,7 +262,7 @@ export default function StudentCalendarSection({
       setModalAction("book");
       setModalOpen(true);
     },
-    [slots]
+    [slots, planRemaining]
   );
 
   const handleCancelClick = useCallback(
@@ -217,11 +270,15 @@ export default function StudentCalendarSection({
       const slot = slots.find((s) => s.id === slotId);
       if (!slot) return;
 
-      const { allowed, hoursLeft } = canCancelSlot(slot.startTime);
+      const { allowed, hoursLeft } = canCancelBooking(
+        slot.bookingDate ?? new Date(),
+        slot.startTime,
+        minCancelHours
+      );
 
       if (!allowed) {
         toast.error(
-          `No puedes cancelar con menos de 12 horas de anticipación. ` +
+          `No puedes cancelar con menos de ${minCancelHours} horas de anticipación. ` +
             `Quedan ${hoursLeft} horas para la sesión.`
         );
         return;
@@ -232,7 +289,7 @@ export default function StudentCalendarSection({
       setModalAction("cancel");
       setModalOpen(true);
     },
-    [slots]
+    [slots, minCancelHours]
   );
 
   const handleConfirmBook = async () => {
@@ -245,7 +302,7 @@ export default function StudentCalendarSection({
     }
 
     const selectedDate = weekDays[selectedDayIdx];
-    const bookingDate = selectedDate.toISOString().split("T")[0]; // YYYY-MM-DD
+    const bookingDate = selectedDate.toISOString().split("T")[0];
 
     setModalLoading(true);
     try {
@@ -254,7 +311,8 @@ export default function StudentCalendarSection({
         professionalId,
         bookingDate,
         selectedSlot.startTime,
-        selectedSlot.endTime
+        selectedSlot.endTime,
+        selectedSlot.professionalType ?? "kinesiologist"
       );
 
       if (result.success) {
@@ -265,9 +323,17 @@ export default function StudentCalendarSection({
               : s
           )
         );
-        toast.success(
-          `Sesión ${selectedSlot?.startTime} a ${selectedSlot?.endTime} agendada correctamente.`
-        );
+        // Don't decrement plan on booking — only on attendance confirmation.
+        // But show informative toast.
+        if (selectedSlot.professionalType === "nutritionist") {
+          toast.success(
+            `Sesión de nutrición agendada (${selectedSlot.startTime}–${selectedSlot.endTime}). No consume del plan.`
+          );
+        } else {
+          toast.success(
+            `Sesión agendada (${selectedSlot.startTime}–${selectedSlot.endTime}). Se descontará del plan al confirmar tu asistencia.`
+          );
+        }
         setModalOpen(false);
       } else {
         toast.error(`Error al agendar: ${result.error}`);
@@ -302,8 +368,13 @@ export default function StudentCalendarSection({
           )
         );
         toast.success(
-          `Sesión ${selectedSlot?.startTime} a ${selectedSlot?.endTime} cancelada.`
+          `Sesión ${selectedSlot.startTime} a ${selectedSlot.endTime} cancelada.`
         );
+        // Refresh plan in case it was already charged
+        if (studentId) {
+          const res = await getRemainingPlanClasses(studentId);
+          if (res.success) setPlanRemaining(res.remaining ?? 0);
+        }
         setModalOpen(false);
       } else {
         toast.error(`Error al cancelar: ${result.error}`);
@@ -323,6 +394,13 @@ export default function StudentCalendarSection({
     }
   };
 
+  const filteredProfessionals = useMemo(() => {
+    if (selectedType === "all") return professionals;
+    return professionals.filter(
+      (p) => (p.professional_type ?? "kinesiologist") === selectedType
+    );
+  }, [professionals, selectedType]);
+
   return (
     <div>
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
@@ -331,30 +409,110 @@ export default function StudentCalendarSection({
             Agenda de Sesiones
           </h1>
           <p className="text-gray-400 text-sm font-inter mt-1">
-            Gestiona tus horarios y disponibilidad para la semana actual.
+            Selecciona profesional, día y horario para tu próxima sesión.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 bg-[#0f131a] border border-white/[0.08] rounded-xl px-4 py-2.5 self-start">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
-            onClick={prevWeek}
-            className="text-gray-400 hover:text-white transition"
-            aria-label="Semana anterior"
+            onClick={goToToday}
+            className="px-3 py-2 rounded-lg bg-[#00d4ff]/10 border border-[#00d4ff]/30 text-[#00d4ff] text-xs font-semibold font-lexend hover:bg-[#00d4ff]/20 transition"
           >
-            <ChevronLeft className="w-4 h-4" />
+            Hoy
           </button>
-          <span className="text-white text-sm font-semibold font-lexend px-2 whitespace-nowrap">
-            {formatWeekRange(weekStart)}
-          </span>
-          <button
-            onClick={nextWeek}
-            className="text-gray-400 hover:text-white transition"
-            aria-label="Semana siguiente"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-2 bg-[#0f131a] border border-white/[0.08] rounded-xl px-4 py-2.5">
+            <button
+              onClick={prevWeek}
+              className="text-gray-400 hover:text-white transition"
+              aria-label="Semana anterior"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="text-white text-sm font-semibold font-lexend px-2 whitespace-nowrap">
+              {formatWeekRange(weekStart)}
+            </span>
+            <button
+              onClick={nextWeek}
+              className="text-gray-400 hover:text-white transition"
+              aria-label="Semana siguiente"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Plan status + filters */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
+        {/* Plan classes remaining */}
+        <div className="flex items-center gap-3 p-4 rounded-xl bg-[#0f131a] border border-white/[0.06]">
+          <div className="w-10 h-10 rounded-lg bg-[#00d4ff]/10 border border-[#00d4ff]/20 flex items-center justify-center">
+            <CreditCard className="w-5 h-5 text-[#00d4ff]" />
+          </div>
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-gray-500 font-lexend font-semibold">
+              Clases disponibles en tu plan
+            </p>
+            <p className="text-white text-lg font-bold font-montserrat">
+              {planRemaining}{" "}
+              <span className="text-gray-500 text-sm font-normal">
+                / {planTotal}
+              </span>
+            </p>
+          </div>
+        </div>
+
+        {/* Professional type filter */}
+        <div className="flex flex-col gap-1.5 p-3 rounded-xl bg-[#0f131a] border border-white/[0.06]">
+          <label className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold font-lexend px-1">
+            Tipo de sesión
+          </label>
+          <select
+            value={selectedType}
+            onChange={(e) => {
+              setSelectedType(e.target.value as any);
+              setSelectedProfessionalId("all");
+            }}
+            className="bg-[#0a0e1a] border border-white/10 rounded-lg px-3 py-2 text-sm text-white font-inter focus:outline-none focus:border-[#00d4ff]/40"
+          >
+            <option value="all">Todos los tipos</option>
+            <option value="kinesiologist">Kinesiología (consume plan)</option>
+            <option value="nutritionist">Nutrición (no consume plan)</option>
+            <option value="therapist">Terapia (consume plan)</option>
+          </select>
+        </div>
+
+        {/* Professional selector */}
+        <div className="flex flex-col gap-1.5 p-3 rounded-xl bg-[#0f131a] border border-white/[0.06]">
+          <label className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold font-lexend px-1">
+            Profesional
+          </label>
+          <select
+            value={selectedProfessionalId}
+            onChange={(e) => setSelectedProfessionalId(e.target.value)}
+            className="bg-[#0a0e1a] border border-white/10 rounded-lg px-3 py-2 text-sm text-white font-inter focus:outline-none focus:border-[#00d4ff]/40"
+          >
+            <option value="all">Todos los profesionales</option>
+            {filteredProfessionals.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.full_name}
+                {p.professional_type ? ` — ${p.professional_type}` : ""}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Nutritionist info banner */}
+      {selectedType === "nutritionist" && (
+        <div className="mb-5 flex items-start gap-2 p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
+          <Apple className="w-4 h-4 text-purple-400 flex-shrink-0 mt-0.5" />
+          <p className="text-purple-300 text-xs font-inter">
+            Las sesiones con nutricionista no se descuentan de tu plan de
+            entrenamiento. Se cobran por separado.
+          </p>
+        </div>
+      )}
 
       <div className="flex flex-col lg:flex-row gap-5">
         {/* Day selector */}
@@ -365,6 +523,7 @@ export default function StudentCalendarSection({
             </p>
             {weekDays.map((d, i) => {
               const active = i === selectedDayIdx;
+              const isTodayDay = isSameDay(d, today);
               const dayNameFull = DAY_NAMES_FULL[d.getDay()];
               const dayNameShort = DAY_NAMES_SHORT[d.getDay()];
               const dayDate = `${d.getDate()} ${MONTH_NAMES[d.getMonth()]}`;
@@ -375,18 +534,25 @@ export default function StudentCalendarSection({
                   className={`text-left px-4 py-3 rounded-xl border transition-all duration-150 font-lexend flex-shrink-0 lg:w-36 ${
                     active
                       ? "bg-[#00d4ff]/[0.08] border-[#00d4ff]/30 border-l-2 border-l-[#00d4ff]"
+                      : isTodayDay
+                      ? "bg-[#00d4ff]/[0.03] border-[#00d4ff]/15"
                       : "bg-[#0f131a] border-white/[0.05] hover:border-white/10 hover:bg-white/[0.02]"
                   }`}
                 >
                   <p
-                    className={`text-[10px] font-medium tracking-wider uppercase ${
-                      active ? "text-[#00d4ff]" : "text-gray-600"
+                    className={`text-[10px] font-medium tracking-wider uppercase flex items-center gap-1 ${
+                      active ? "text-[#00d4ff]" : isTodayDay ? "text-[#00d4ff]/70" : "text-gray-600"
                     }`}
                   >
                     <span className="hidden lg:inline">
                       {dayNameFull.toUpperCase()}
                     </span>
                     <span className="lg:hidden">{dayNameShort.toUpperCase()}</span>
+                    {isTodayDay && (
+                      <span className="text-[8px] bg-[#00d4ff]/20 text-[#00d4ff] px-1 rounded">
+                        HOY
+                      </span>
+                    )}
                   </p>
                   <p
                     className={`text-sm font-bold mt-0.5 ${
@@ -407,7 +573,16 @@ export default function StudentCalendarSection({
             <div className="flex items-center gap-2 mb-4">
               <Clock className="w-5 h-5 text-[#00d4ff]" />
               <h2 className="text-white font-semibold font-lexend text-sm">
-                Horarios Disponibles
+                Horarios{" "}
+                {selectedProfessionalId !== "all" && (
+                  <span className="text-gray-500 font-normal">
+                    —{" "}
+                    {
+                      professionals.find((p) => p.id === selectedProfessionalId)
+                        ?.full_name
+                    }
+                  </span>
+                )}
               </h2>
             </div>
 
@@ -417,7 +592,8 @@ export default function StudentCalendarSection({
               </div>
             ) : slots.length === 0 ? (
               <div className="py-8 text-center text-gray-500">
-                No hay horarios disponibles para este día
+                No hay horarios disponibles para este día con los filtros
+                seleccionados.
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
@@ -427,6 +603,7 @@ export default function StudentCalendarSection({
                     slot={slot}
                     onBook={handleBookClick}
                     onCancel={handleCancelClick}
+                    minCancelHours={minCancelHours}
                   />
                 ))}
               </div>
@@ -444,8 +621,10 @@ export default function StudentCalendarSection({
         }
         message={
           modalAction === "book"
-            ? `¿Deseas agendar la sesión de ${selectedSlot?.startTime} a ${selectedSlot?.endTime}?`
-            : `¿Estás seguro de que deseas cancelar la sesión de ${selectedSlot?.startTime} a ${selectedSlot?.endTime}? No podrás recuperar el cupo.`
+            ? selectedSlot?.professionalType === "nutritionist"
+              ? `Sesión de Nutrición ${selectedSlot?.startTime} a ${selectedSlot?.endTime}. No consume del plan; se cobra por separado.`
+              : `¿Deseas agendar la sesión de ${selectedSlot?.startTime} a ${selectedSlot?.endTime}? Se descontará 1 clase de tu plan al confirmar asistencia.`
+            : `¿Estás seguro de que deseas cancelar la sesión de ${selectedSlot?.startTime} a ${selectedSlot?.endTime}? Cancelaciones con menos de ${minCancelHours}h no son reembolsables.`
         }
         confirmLabel={
           modalAction === "book" ? "Agendar Sesión" : "Cancelar Sesión"

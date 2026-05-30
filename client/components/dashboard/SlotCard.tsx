@@ -1,4 +1,4 @@
-import { Clock, AlertCircle, Lock } from "lucide-react";
+import { Clock, AlertCircle, Lock, History } from "lucide-react";
 
 export interface TimeSlot {
   id: string;
@@ -8,25 +8,32 @@ export interface TimeSlot {
   booked: number;
   userBooked: boolean;
   professionalId?: string; // ID del profesional — necesario para crear el booking
+  professionalType?: "kinesiologist" | "nutritionist" | "therapist";
+  isPast?: boolean; // si el slot ya pasó (fecha + hora < ahora)
+  bookingDate?: Date; // fecha completa del booking (para cálculo de cancelación)
 }
 
 interface SlotCardProps {
   slot: TimeSlot;
   onBook: (slotId: string) => void;
   onCancel: (slotId: string) => void;
+  minCancelHours?: number; // política de cancelación (default 12h)
 }
 
-// Helper: Check if cancellation is allowed (12-hour rule)
-function canCancelSlot(startTime: string): { allowed: boolean; hoursLeft?: number } {
+// Helper: Check if cancellation is allowed using booking's actual date (not "today")
+function canCancelSlot(
+  startTime: string,
+  bookingDate?: Date,
+  minHours: number = 12
+): { allowed: boolean; hoursLeft: number } {
   const [hours, minutes] = startTime.split(":").map(Number);
-  const slotStart = new Date();
+  const slotStart = bookingDate ? new Date(bookingDate) : new Date();
   slotStart.setHours(hours, minutes, 0, 0);
 
-  const now = new Date();
-  const hoursDiff = (slotStart.getTime() - now.getTime()) / (1000 * 60 * 60);
+  const hoursDiff = (slotStart.getTime() - Date.now()) / (1000 * 60 * 60);
 
   return {
-    allowed: hoursDiff >= 12,
+    allowed: hoursDiff >= minHours,
     hoursLeft: Math.max(0, Math.ceil(hoursDiff)),
   };
 }
@@ -50,13 +57,34 @@ function ProgressBar({ booked, capacity }: { booked: number; capacity: number })
   );
 }
 
-export default function SlotCard({ slot, onBook, onCancel }: SlotCardProps) {
-  const { id, startTime, endTime, capacity, booked, userBooked } = slot;
+export default function SlotCard({
+  slot,
+  onBook,
+  onCancel,
+  minCancelHours = 12,
+}: SlotCardProps) {
+  const {
+    id,
+    startTime,
+    endTime,
+    capacity,
+    booked,
+    userBooked,
+    professionalType,
+    isPast,
+    bookingDate,
+  } = slot;
   const isFull = booked >= capacity;
-  const available = !isFull && !userBooked;
-  const { allowed: canCancel, hoursLeft } = canCancelSlot(startTime);
+  const available = !isFull && !userBooked && !isPast;
+  const { allowed: canCancel, hoursLeft } = canCancelSlot(
+    startTime,
+    bookingDate,
+    minCancelHours
+  );
 
-  const cuposColor = userBooked
+  const cuposColor = isPast
+    ? "text-zinc-600"
+    : userBooked
     ? "text-[#00d4ff]"
     : isFull
     ? "text-zinc-500"
@@ -64,12 +92,21 @@ export default function SlotCard({ slot, onBook, onCancel }: SlotCardProps) {
     ? "text-[#00d4ff]"
     : "text-amber-400";
 
+  const typeBadge =
+    professionalType === "nutritionist"
+      ? { label: "Nutrición", className: "bg-purple-500/10 text-purple-400 border-purple-500/20" }
+      : professionalType === "therapist"
+      ? { label: "Terapia", className: "bg-amber-500/10 text-amber-400 border-amber-500/20" }
+      : null;
+
   return (
     <div
       className={`
         flex flex-col gap-2 p-4 rounded-xl border transition-all duration-200
         bg-[#0f131a]
-        ${userBooked
+        ${isPast
+          ? "border-white/[0.04] opacity-50"
+          : userBooked
           ? "border-[#00d4ff]/20 shadow-[0_0_12px_rgba(0,212,255,0.08)]"
           : "border-white/[0.06] hover:border-white/10"
         }
@@ -77,10 +114,15 @@ export default function SlotCard({ slot, onBook, onCancel }: SlotCardProps) {
     >
       {/* Time row */}
       <div className="flex items-center gap-1.5">
-        <Clock className="w-3.5 h-3.5 text-[#00d4ff] flex-shrink-0" />
-        <span className="text-white text-sm font-semibold font-lexend whitespace-nowrap">
+        <Clock className={`w-3.5 h-3.5 flex-shrink-0 ${isPast ? "text-zinc-600" : "text-[#00d4ff]"}`} />
+        <span className={`text-sm font-semibold font-lexend whitespace-nowrap ${isPast ? "text-zinc-500" : "text-white"}`}>
           {startTime} a {endTime}
         </span>
+        {typeBadge && (
+          <span className={`ml-auto text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded border ${typeBadge.className}`}>
+            {typeBadge.label}
+          </span>
+        )}
       </div>
 
       {/* Capacity row */}
@@ -94,18 +136,28 @@ export default function SlotCard({ slot, onBook, onCancel }: SlotCardProps) {
       {/* Progress bar */}
       <ProgressBar booked={booked} capacity={capacity} />
 
-      {/* 12-hour cancellation rule warning */}
-      {userBooked && !canCancel && (
+      {/* Past slot indicator */}
+      {isPast && (
+        <div className="mt-1 flex items-center gap-2 p-2 rounded-lg bg-zinc-500/10 border border-zinc-500/20">
+          <History className="w-3.5 h-3.5 text-zinc-400 flex-shrink-0" />
+          <p className="text-zinc-400 text-[10px] font-inter leading-tight">
+            Este horario ya pasó
+          </p>
+        </div>
+      )}
+
+      {/* Cancellation rule warning (uses real bookingDate) */}
+      {userBooked && !isPast && !canCancel && (
         <div className="mt-1 flex items-start gap-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
           <AlertCircle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
           <p className="text-amber-300 text-[10px] font-inter leading-tight">
-            Cancelación no permitida. Menos de 12 horas para la sesión.
+            Cancelación no permitida. Quedan {hoursLeft}h (mín {minCancelHours}h).
           </p>
         </div>
       )}
 
       {/* Action buttons */}
-      {userBooked && canCancel && (
+      {!isPast && userBooked && canCancel && (
         <button
           onClick={() => onCancel(id)}
           className="mt-1 w-full py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold font-lexend tracking-wide uppercase hover:bg-red-500/20 transition"
@@ -113,7 +165,7 @@ export default function SlotCard({ slot, onBook, onCancel }: SlotCardProps) {
           Cancelar Sesión
         </button>
       )}
-      {userBooked && !canCancel && (
+      {!isPast && userBooked && !canCancel && (
         <button
           disabled
           className="mt-1 w-full py-1.5 rounded-lg bg-gray-500/10 border border-gray-500/20 text-gray-500 text-xs font-bold font-lexend tracking-wide uppercase opacity-50 cursor-not-allowed flex items-center justify-center gap-2"
@@ -130,7 +182,7 @@ export default function SlotCard({ slot, onBook, onCancel }: SlotCardProps) {
           Agendar Sesión
         </button>
       )}
-      {isFull && !userBooked && (
+      {isFull && !userBooked && !isPast && (
         <div className="mt-1 text-center text-xs text-zinc-600 font-inter">
           Sin cupos disponibles
         </div>

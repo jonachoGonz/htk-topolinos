@@ -1,13 +1,16 @@
 import { useEffect, useState } from "react";
-import { Trash2, Plus, Edit2 } from "lucide-react";
+import { Trash2, Plus, Edit2, Users } from "lucide-react";
 import { toast } from "sonner";
 import {
   getAvailability,
   createAvailability,
   deleteAvailability,
   type Availability,
+  type ProfessionalType,
 } from "@/services/supabase";
 import EditAvailabilityModal from "./EditAvailabilityModal";
+import BulkAvailabilityForm from "./BulkAvailabilityForm";
+import SlotStudentsList from "./SlotStudentsList";
 
 interface AvailabilityManagerProps {
   professionalId: string;
@@ -29,14 +32,33 @@ export default function AvailabilityManager({
   const [availabilities, setAvailabilities] = useState<Availability[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [mode, setMode] = useState<"single" | "bulk">("bulk");
   const [selectedAvailability, setSelectedAvailability] =
     useState<Availability | null>(null);
+  const [viewStudentsFor, setViewStudentsFor] = useState<{
+    avail: Availability;
+    date: string;
+  } | null>(null);
   const [formData, setFormData] = useState({
     dayOfWeek: "0",
     startTime: "09:00",
     endTime: "10:30",
     maxCapacity: "5",
+    professionalType: "kinesiologist" as ProfessionalType,
   });
+
+  const today = new Date();
+  // Convert JS getDay (0=Sun..6=Sat) to DB day_of_week (0=Mon..6=Sun)
+  const dbToday = today.getDay() === 0 ? 6 : today.getDay() - 1;
+  // Build the YYYY-MM-DD of the most recent occurrence of the slot's day_of_week
+  const getNextDateForDay = (dayOfWeek: number): string => {
+    const d = new Date();
+    const dbCurrent = d.getDay() === 0 ? 6 : d.getDay() - 1;
+    let diff = dayOfWeek - dbCurrent;
+    if (diff < 0) diff += 7;
+    d.setDate(d.getDate() + diff);
+    return d.toISOString().split("T")[0];
+  };
 
   useEffect(() => {
     fetchAvailabilities();
@@ -65,7 +87,8 @@ export default function AvailabilityManager({
       parseInt(formData.dayOfWeek),
       formData.startTime,
       formData.endTime,
-      parseInt(formData.maxCapacity)
+      parseInt(formData.maxCapacity),
+      formData.professionalType
     );
 
     if (result.success) {
@@ -95,7 +118,39 @@ export default function AvailabilityManager({
 
   return (
     <div className="space-y-6">
-      {/* Create Form */}
+      {/* Mode selector */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => setMode("bulk")}
+          className={`px-4 py-2 rounded-lg text-sm font-semibold font-lexend transition ${
+            mode === "bulk"
+              ? "bg-[#00d4ff]/15 border border-[#00d4ff]/40 text-[#00d4ff]"
+              : "bg-[#0a0e1a] border border-white/10 text-gray-400 hover:text-white"
+          }`}
+        >
+          Asignación Masiva (Recomendado)
+        </button>
+        <button
+          onClick={() => setMode("single")}
+          className={`px-4 py-2 rounded-lg text-sm font-semibold font-lexend transition ${
+            mode === "single"
+              ? "bg-[#00d4ff]/15 border border-[#00d4ff]/40 text-[#00d4ff]"
+              : "bg-[#0a0e1a] border border-white/10 text-gray-400 hover:text-white"
+          }`}
+        >
+          Día individual
+        </button>
+      </div>
+
+      {mode === "bulk" && (
+        <BulkAvailabilityForm
+          professionalId={professionalId}
+          onSuccess={fetchAvailabilities}
+        />
+      )}
+
+      {/* Create Form (single mode) */}
+      {mode === "single" && (
       <div className="bg-[#0f131a] border border-white/[0.06] rounded-xl p-6">
         <h2 className="text-lg font-semibold text-white font-lexend mb-4">
           Agregar Disponibilidad
@@ -171,6 +226,24 @@ export default function AvailabilityManager({
             />
           </div>
 
+          {/* Professional Type */}
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-inter text-gray-400 uppercase">
+              Tipo
+            </label>
+            <select
+              value={formData.professionalType}
+              onChange={(e) =>
+                setFormData({ ...formData, professionalType: e.target.value as ProfessionalType })
+              }
+              className="bg-[#0a0e1a] border border-white/10 rounded-lg px-3 py-2 text-sm text-white font-inter focus:outline-none focus:border-[#00d4ff]/40"
+            >
+              <option value="kinesiologist">Kinesiólogo</option>
+              <option value="nutritionist">Nutricionista</option>
+              <option value="therapist">Terapeuta</option>
+            </select>
+          </div>
+
           {/* Button */}
           <div className="flex flex-col gap-2 justify-end">
             <button
@@ -184,6 +257,7 @@ export default function AvailabilityManager({
           </div>
         </div>
       </div>
+      )}
 
       {/* Availabilities Table */}
       <div className="bg-[#0f131a] border border-white/[0.06] rounded-xl overflow-hidden">
@@ -209,26 +283,68 @@ export default function AvailabilityManager({
                   <th className="px-6 py-3">Día</th>
                   <th className="px-6 py-3">Inicio</th>
                   <th className="px-6 py-3">Fin</th>
+                  <th className="px-6 py-3">Tipo</th>
                   <th className="px-6 py-3">Capacidad</th>
                   <th className="px-6 py-3">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/[0.04]">
-                {availabilities.map((av) => (
+                {availabilities.map((av) => {
+                  const isToday = av.day_of_week === dbToday;
+                  const typeLabel =
+                    av.professional_type === "nutritionist"
+                      ? "Nutrición"
+                      : av.professional_type === "therapist"
+                      ? "Terapia"
+                      : "Kinesiología";
+                  return (
                   <tr
                     key={av.id}
-                    className="hover:bg-white/[0.02] transition text-white"
+                    className={`hover:bg-white/[0.02] transition text-white ${
+                      isToday ? "bg-[#00d4ff]/[0.04]" : ""
+                    }`}
                   >
                     <td className="px-6 py-3 font-medium">
                       {DAYS_OF_WEEK[av.day_of_week]}
+                      {isToday && (
+                        <span className="ml-2 text-[10px] uppercase tracking-wider text-[#00d4ff] font-semibold">
+                          • Hoy
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-3 text-gray-400">
                       {av.start_time}
                     </td>
                     <td className="px-6 py-3 text-gray-400">{av.end_time}</td>
+                    <td className="px-6 py-3">
+                      <span
+                        className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase ${
+                          av.professional_type === "nutritionist"
+                            ? "bg-purple-500/10 text-purple-400 border border-purple-500/20"
+                            : av.professional_type === "therapist"
+                            ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                            : "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20"
+                        }`}
+                      >
+                        {typeLabel}
+                      </span>
+                    </td>
                     <td className="px-6 py-3">{av.max_capacity} personas</td>
                     <td className="px-6 py-3">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <button
+                          onClick={() =>
+                            setViewStudentsFor({
+                              avail: av,
+                              date: getNextDateForDay(av.day_of_week),
+                            })
+                          }
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-emerald-400 hover:bg-emerald-500/10 rounded transition text-sm"
+                          title="Ver alumnos inscritos"
+                        >
+                          <Users className="w-4 h-4" />
+                          Alumnos
+                        </button>
                         <button
                           onClick={() => setSelectedAvailability(av)}
                           className="flex items-center gap-1.5 px-3 py-1.5 text-blue-400 hover:bg-blue-500/10 rounded transition text-sm"
@@ -246,7 +362,8 @@ export default function AvailabilityManager({
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -259,6 +376,18 @@ export default function AvailabilityManager({
           availability={selectedAvailability}
           onClose={() => setSelectedAvailability(null)}
           onSuccess={fetchAvailabilities}
+        />
+      )}
+
+      {/* View students in slot */}
+      {viewStudentsFor && (
+        <SlotStudentsList
+          professionalId={professionalId}
+          bookingDate={viewStudentsFor.date}
+          startTime={viewStudentsFor.avail.start_time.slice(0, 5)}
+          endTime={viewStudentsFor.avail.end_time.slice(0, 5)}
+          professionalType={viewStudentsFor.avail.professional_type as any}
+          onClose={() => setViewStudentsFor(null)}
         />
       )}
     </div>
