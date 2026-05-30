@@ -1,5 +1,4 @@
 import "./global.css";
-
 import { Suspense, lazy, useEffect } from "react";
 import { registerServiceWorker } from "@/hooks/useOfflineMode";
 import { Toaster } from "@/components/ui/toaster";
