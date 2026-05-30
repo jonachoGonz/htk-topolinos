@@ -876,7 +876,7 @@ export async function getAllProfessionals(
   try {
     let query = supabase
       .from("profiles")
-      .select("id, full_name, email, specialization, professional_type")
+      .select("id, full_name, specialization, professional_type")
       .eq("role", "teacher");
 
     if (filterType) {
@@ -908,7 +908,7 @@ export async function getBookingsForSlot(
         id, student_id, booking_date, start_time, end_time, status,
         attended, attendance_confirmed_at, charged_from_plan, charged_at,
         professional_type,
-        student:profiles!bookings_student_id_fkey(id, full_name, email)
+        student:profiles!bookings_student_id_fkey(id, full_name)
         `
       )
       .eq("professional_id", professionalId)
@@ -1230,9 +1230,11 @@ export async function getStudents(): Promise<{
   error?: string;
 }> {
   try {
+    // profiles table doesn't have email; email lives in auth.users (not directly queryable from client).
+    // Return id + full_name; email can be fetched separately via admin RPC if needed.
     const { data, error } = await supabase
       .from("profiles")
-      .select("id, full_name, email")
+      .select("id, full_name")
       .eq("role", "student")
       .order("full_name", { ascending: true });
     if (error) return { success: false, error: error.message };

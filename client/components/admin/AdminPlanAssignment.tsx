@@ -82,11 +82,7 @@ export default function AdminPlanAssignment() {
 
   const filtered = students.filter((s) => {
     const q = search.toLowerCase();
-    return (
-      !q ||
-      s.full_name?.toLowerCase().includes(q) ||
-      s.email?.toLowerCase().includes(q)
-    );
+    return !q || s.full_name?.toLowerCase().includes(q);
   });
 
   return (
@@ -107,7 +103,7 @@ export default function AdminPlanAssignment() {
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar alumno por nombre o email..."
+          placeholder="Buscar alumno por nombre..."
           className="flex-1 bg-transparent py-2.5 text-sm text-white font-inter focus:outline-none"
         />
       </div>
@@ -134,9 +130,9 @@ export default function AdminPlanAssignment() {
                   <p className="text-white font-semibold font-lexend text-sm">
                     {s.full_name || "Sin nombre"}
                   </p>
-                  {s.email && (
-                    <p className="text-gray-500 text-xs font-inter">{s.email}</p>
-                  )}
+                  <p className="text-gray-600 text-[10px] font-inter">
+                    ID: {s.id.slice(0, 8)}...
+                  </p>
                 </div>
                 {s.current_plan && (
                   <div className="text-right">
