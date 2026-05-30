@@ -1,0 +1,62 @@
+{
+  "name": "HTK Center - Gestión de Kinesiología",
+  "short_name": "HTK Center",
+  "description": "PWA para centro de entrenamiento integral con gestión de profesionales, estudiantes, planes y pagos",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#ffffff",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "32x32",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "/favicon.ico",
+      "sizes": "192x192",
+      "type": "image/x-icon",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon.ico",
+      "sizes": "512x512",
+      "type": "image/x-icon",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": ["productivity", "business"],
+  "screenshots": [
+    {
+      "src": "/placeholder.svg",
+      "sizes": "540x720",
+      "type": "image/svg+xml",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "/placeholder.svg",
+      "sizes": "1280x720",
+      "type": "image/svg+xml",
+      "form_factor": "wide"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Dashboard Profesor",
+      "short_name": "Dashboard",
+      "description": "Acceder al dashboard del profesor",
+      "url": "/dashboard?mode=teacher",
+      "icons": [{ "src": "/favicon.ico", "sizes": "192x192" }]
+    },
+    {
+      "name": "Dashboard Estudiante",
+      "short_name": "Mis Clases",
+      "description": "Acceder al dashboard del estudiante",
+      "url": "/dashboard/student?mode=student",
+      "icons": [{ "src": "/favicon.ico", "sizes": "192x192" }]
+    }
+  ],
+  "prefer_related_applications": false
+}
