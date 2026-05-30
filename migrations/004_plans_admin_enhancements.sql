@@ -3,6 +3,17 @@
 -- Purpose: Expand plan_templates schema, set admin flag, auto-assign default plan to new students
 
 -- ===================================================================
+-- 0. Relax legacy CHECK constraints so price=0 (free / default plan) is allowed
+-- ===================================================================
+ALTER TABLE plan_templates
+  DROP CONSTRAINT IF EXISTS plan_templates_price_per_month_check;
+ALTER TABLE plan_templates
+  ADD CONSTRAINT plan_templates_price_per_month_check
+  CHECK (price_per_month >= 0);
+
+-- (sessions_per_month > 0 stays — a plan with zero classes makes no sense)
+
+-- ===================================================================
 -- 1. EXPAND plan_templates with all the new fields from MVP spec
 -- ===================================================================
 ALTER TABLE plan_templates
