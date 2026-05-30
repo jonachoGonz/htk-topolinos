@@ -586,6 +586,131 @@ export async function getPlanHistory(
 }
 
 /**
+ * Holiday interface
+ */
+export interface Holiday {
+  id: string;
+  professional_id: string;
+  title: string;
+  start_date: string;
+  end_date: string;
+  is_recurring: boolean;
+  recurring_type?: "yearly" | "monthly";
+  notes?: string;
+  created_at: string;
+}
+
+/**
+ * Get holidays for a professional
+ */
+export async function getHolidays(
+  professionalId: string
+): Promise<{ success: boolean; data?: Holiday[]; error?: string }> {
+  try {
+    const { data, error } = await supabase
+      .from("holidays")
+      .select("*")
+      .eq("professional_id", professionalId)
+      .order("start_date", { ascending: true });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, data: data || [] };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+}
+
+/**
+ * Create a holiday
+ */
+export async function createHoliday(
+  professionalId: string,
+  title: string,
+  startDate: string,
+  endDate: string,
+  isRecurring: boolean,
+  recurringType?: "yearly" | "monthly",
+  notes?: string
+): Promise<{ success: boolean; error?: string }> {
+  if (!title || !startDate || !endDate) {
+    return { success: false, error: "Por favor completa todos los campos" };
+  }
+
+  if (new Date(startDate) >= new Date(endDate)) {
+    return { success: false, error: "La fecha de inicio debe ser anterior a la de fin" };
+  }
+
+  try {
+    const { error } = await supabase.from("holidays").insert({
+      professional_id: professionalId,
+      title,
+      start_date: startDate,
+      end_date: endDate,
+      is_recurring: isRecurring,
+      recurring_type: isRecurring ? recurringType : null,
+      notes: notes || null,
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+}
+
+/**
+ * Delete a holiday
+ */
+export async function deleteHoliday(
+  id: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { error } = await supabase.from("holidays").delete().eq("id", id);
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+}
+
+/**
+ * Check if a date is a holiday for a professional
+ */
+export async function isDateHoliday(
+  professionalId: string,
+  date: string
+): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from("holidays")
+      .select("*")
+      .eq("professional_id", professionalId)
+      .lte("start_date", date)
+      .gte("end_date", date);
+
+    if (error) {
+      console.error("Error checking holiday:", error);
+      return false;
+    }
+
+    return (data && data.length > 0) || false;
+  } catch (error) {
+    console.error("Error checking holiday:", error);
+    return false;
+  }
+}
+
+/**
  * Sign out the current user
  */
 export async function logout(): Promise<void> {
