@@ -22,6 +22,7 @@ import {
   type CancellationPolicy,
 } from "@/services/contentful";
 
+// Note: week display is Mon→Sun. These arrays are indexed by JS getDay() (0=Sun..6=Sat).
 const DAY_NAMES_SHORT = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 const DAY_NAMES_FULL = [
   "Domingo",
@@ -32,6 +33,13 @@ const DAY_NAMES_FULL = [
   "Viernes",
   "Sábado",
 ];
+
+/**
+ * Convert JS getDay() (0=Sun..6=Sat) to Monday-first index (0=Mon..6=Sun)
+ */
+function jsDayToMondayFirst(jsDay: number): number {
+  return jsDay === 0 ? 6 : jsDay - 1;
+}
 const MONTH_NAMES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
@@ -56,14 +64,16 @@ function buildWeekDays(weekStart: Date) {
 }
 
 /**
- * Get the Sunday of the current week — using the user's local timezone.
- * Note: The "week start" is Sunday for display purposes.
+ * Get the Monday of the current week — using the user's local timezone.
+ * Week is displayed Mon→Sun (Sunday is the last day).
  */
 function getCurrentWeekStart(): Date {
   const today = new Date();
-  const day = today.getDay(); // 0=Sun..6=Sat
+  const jsDay = today.getDay(); // 0=Sun..6=Sat
+  // Days to subtract to land on Monday
+  const subtract = jsDay === 0 ? 6 : jsDay - 1;
   const d = new Date(today);
-  d.setDate(today.getDate() - day);
+  d.setDate(today.getDate() - subtract);
   d.setHours(0, 0, 0, 0);
   return d;
 }
@@ -83,9 +93,11 @@ interface StudentCalendarSectionProps {
 export default function StudentCalendarSection({
   studentId,
 }: StudentCalendarSectionProps) {
-  // Initialize on TODAY's week, selecting TODAY as the active day
+  // Initialize on TODAY's week (Monday-start), selecting TODAY as the active day (Mon-first index)
   const [weekStart, setWeekStart] = useState(getCurrentWeekStart());
-  const [selectedDayIdx, setSelectedDayIdx] = useState(() => new Date().getDay());
+  const [selectedDayIdx, setSelectedDayIdx] = useState(() =>
+    jsDayToMondayFirst(new Date().getDay())
+  );
 
   const [slots, setSlots] = useState<TimeSlot[]>([]);
   const [policy, setPolicy] = useState<CancellationPolicy | null>(null);
@@ -149,9 +161,8 @@ export default function StudentCalendarSection({
     const availResult = await getStudentAvailability(studentId, weekStart);
     if (availResult.success && availResult.data) {
       const selectedDate = weekDays[selectedDayIdx];
-      const jsDay = selectedDate.getDay();
-      // DB stores day_of_week: 0=Mon..6=Sun. JS getDay: 0=Sun..6=Sat → map.
-      const dbDayOfWeek = jsDay === 0 ? 6 : jsDay - 1;
+      // DB stores day_of_week: 0=Mon..6=Sun. Convert from JS getDay (0=Sun..6=Sat).
+      const dbDayOfWeek = jsDayToMondayFirst(selectedDate.getDay());
 
       let dayAvailabilities = availResult.data.filter(
         (a) => a.day_of_week === dbDayOfWeek
@@ -229,7 +240,7 @@ export default function StudentCalendarSection({
 
   const goToToday = () => {
     setWeekStart(getCurrentWeekStart());
-    setSelectedDayIdx(new Date().getDay());
+    setSelectedDayIdx(jsDayToMondayFirst(new Date().getDay()));
   };
 
   const handleBookClick = useCallback(
