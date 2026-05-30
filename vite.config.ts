@@ -15,6 +15,28 @@ export default defineConfig(({ mode }) => ({
   },
   build: {
     outDir: "dist/spa",
+    rollupOptions: {
+      output: {
+        manualChunks: (id) => {
+          if (id.includes("node_modules/react") || id.includes("node_modules/react-dom") || id.includes("node_modules/react-router-dom")) {
+            return "vendor-react";
+          }
+          if (id.includes("node_modules/@supabase")) {
+            return "vendor-supabase";
+          }
+          if (id.includes("node_modules/recharts")) {
+            return "vendor-charts";
+          }
+          if (id.includes("node_modules/@radix-ui")) {
+            return "vendor-ui";
+          }
+          if (id.includes("node_modules/react-hook-form")) {
+            return "vendor-forms";
+          }
+        },
+      },
+    },
+    chunkSizeWarningLimit: 1000,
   },
   plugins: [react(), expressPlugin()],
   resolve: {
