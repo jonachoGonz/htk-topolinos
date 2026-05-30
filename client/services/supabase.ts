@@ -212,7 +212,7 @@ export async function createBooking(
   professionalType: ProfessionalType = "kinesiologist"
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const { error } = await supabase.from("bookings").insert({
+    let { error } = await supabase.from("bookings").insert({
       student_id: studentId,
       professional_id: professionalId,
       booking_date: bookingDate,
@@ -221,6 +221,19 @@ export async function createBooking(
       status: "confirmed",
       professional_type: professionalType,
     });
+
+    // Fallback for legacy schema (no professional_type column yet)
+    if (error && /column|schema cache/i.test(error.message)) {
+      const retry = await supabase.from("bookings").insert({
+        student_id: studentId,
+        professional_id: professionalId,
+        booking_date: bookingDate,
+        start_time: startTime,
+        end_time: endTime,
+        status: "confirmed",
+      });
+      error = retry.error;
+    }
 
     if (error) {
       return { success: false, error: error.message };
@@ -308,7 +321,7 @@ export async function createAvailability(
   }
 
   try {
-    const { error } = await supabase.from("availability").insert({
+    let { error } = await supabase.from("availability").insert({
       professional_id: professionalId,
       day_of_week: dayOfWeek,
       start_time: startTime,
@@ -317,6 +330,19 @@ export async function createAvailability(
       is_holiday: false,
       professional_type: professionalType,
     });
+
+    // Fallback for legacy schema (no professional_type column yet)
+    if (error && /column|schema cache/i.test(error.message)) {
+      const retry = await supabase.from("availability").insert({
+        professional_id: professionalId,
+        day_of_week: dayOfWeek,
+        start_time: startTime,
+        end_time: endTime,
+        max_capacity: maxCapacity,
+        is_holiday: false,
+      });
+      error = retry.error;
+    }
 
     if (error) {
       return { success: false, error: error.message };
@@ -785,7 +811,7 @@ export async function createBulkAvailability(
 
     // Fallback: insert one-by-one client-side if RPC not available yet
     const bulkGroupId = crypto.randomUUID();
-    const rows = days.map((day) => ({
+    const rowsWithExtras = days.map((day) => ({
       professional_id: professionalId,
       day_of_week: day,
       start_time: startTime,
@@ -797,11 +823,26 @@ export async function createBulkAvailability(
       notes: notes || null,
     }));
 
-    const { error } = await supabase.from("availability").insert(rows);
+    let { error } = await supabase.from("availability").insert(rowsWithExtras);
+
+    // If the new columns don't exist yet (migration not applied), retry with minimal columns
+    if (error && /column|schema cache/i.test(error.message)) {
+      const rowsMinimal = days.map((day) => ({
+        professional_id: professionalId,
+        day_of_week: day,
+        start_time: startTime,
+        end_time: endTime,
+        max_capacity: maxCapacity,
+        is_holiday: false,
+      }));
+      const retry = await supabase.from("availability").insert(rowsMinimal);
+      error = retry.error;
+    }
+
     if (error) {
       return { success: false, error: error.message };
     }
-    return { success: true, data: { bulk_group_id: bulkGroupId, inserted_count: rows.length } };
+    return { success: true, data: { bulk_group_id: bulkGroupId, inserted_count: days.length } };
   } catch (error) {
     return { success: false, error: String(error) };
   }
