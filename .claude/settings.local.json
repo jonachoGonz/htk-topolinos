@@ -10,7 +10,10 @@
       "Bash(git commit *)",
       "Bash(ls /Users/jonachoGonz/.nvm/versions/node/ 2>/dev/null || echo \"nvm path not found\")",
       "Bash(nvm use *)",
-      "Bash(curl -s http://localhost:5173)"
+      "Bash(curl -s http://localhost:5173)",
+      "Bash(npx ts-node *)",
+      "Bash(npm install *)",
+      "Bash(cat ~/.github-token 2>/dev/null | grep GITHUB_TOKEN | cut -d'=' -f2 || echo \"TOKEN_NOT_FOUND\")"
     ]
   }
 }
