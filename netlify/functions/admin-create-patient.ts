@@ -11,6 +11,7 @@
  */
 
 import type { Handler } from "@netlify/functions";
+import { sendEmail, htmlTemplate } from "./_email";
 
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== "POST") {
@@ -51,20 +52,24 @@ export const handler: Handler = async (event) => {
 
     // Parse body
     const body = JSON.parse(event.body || "{}");
-    const { full_name, email, phone, rut_dni, send_invite } = body;
+    const { full_name, email, phone, rut_dni, password, send_invite } = body;
     if (!full_name?.trim() || !email?.trim()) {
       return { statusCode: 400, body: JSON.stringify({ error: "full_name y email son requeridos" }) };
     }
+    if (!send_invite && !password) {
+      return { statusCode: 400, body: JSON.stringify({ error: "Define password o usa send_invite=true" }) };
+    }
+    if (password && password.length < 6) {
+      return { statusCode: 400, body: JSON.stringify({ error: "Password debe tener al menos 6 caracteres" }) };
+    }
 
     // Create auth user via admin API
-    // Use inviteUserByEmail if send_invite, else createUser with auto-confirmed
     let userId: string;
     if (send_invite) {
       const { data, error } = await sb.auth.admin.inviteUserByEmail(email, {
         data: { full_name, role: "student" },
       });
       if (error) {
-        // If already exists, fetch instead
         if (/already|exists/i.test(error.message)) {
           const { data: list } = await sb.auth.admin.listUsers();
           const existing = list?.users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
@@ -77,12 +82,10 @@ export const handler: Handler = async (event) => {
         userId = data.user.id;
       }
     } else {
-      // Create without invite (random temp password — admin must share it)
-      const tempPassword =
-        "Tmp-" + Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6).toUpperCase();
+      // Create with admin-provided password
       const { data, error } = await sb.auth.admin.createUser({
         email,
-        password: tempPassword,
+        password,
         email_confirm: true,
         user_metadata: { full_name, role: "student" },
       });
@@ -92,6 +95,8 @@ export const handler: Handler = async (event) => {
           const existing = list?.users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
           if (!existing) return { statusCode: 409, body: JSON.stringify({ error: error.message }) };
           userId = existing.id;
+          // Try to update password for existing user
+          await sb.auth.admin.updateUserById(userId, { password });
         } else {
           return { statusCode: 400, body: JSON.stringify({ error: error.message }) };
         }
@@ -113,6 +118,23 @@ export const handler: Handler = async (event) => {
       },
       { onConflict: "id" }
     );
+
+    // Email confirmation when admin sets the password directly
+    if (!send_invite && password) {
+      await sendEmail({
+        to: email,
+        subject: "Bienvenido a HTK Center — tus accesos",
+        html: htmlTemplate({
+          title: `Hola ${full_name},`,
+          body: `Se ha creado tu cuenta en HTK Center.<br/><br/>
+            <strong>Email:</strong> ${email}<br/>
+            <strong>Contraseña inicial:</strong> ${password}<br/><br/>
+            Te recomendamos cambiarla luego del primer ingreso desde Configuración.`,
+          ctaText: "Ingresar al portal",
+          ctaUrl: `${process.env.URL || "https://htk-topolinos.netlify.app"}/login`,
+        }),
+      });
+    }
 
     return {
       statusCode: 200,

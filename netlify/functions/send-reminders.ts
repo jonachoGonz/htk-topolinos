@@ -17,6 +17,7 @@
  */
 
 import type { Handler } from "@netlify/functions";
+import { sendEmail, htmlTemplate } from "./_email";
 
 export const handler: Handler = async () => {
   const supabaseUrl = process.env.SUPABASE_URL;
@@ -68,6 +69,22 @@ export const handler: Handler = async () => {
         p_metadata: { booking_id: b.id },
       });
       remindersSent++;
+
+      // Email (best-effort, only if RESEND configured)
+      const { data: studentRow } = await sb
+        .from("profiles").select("email, full_name").eq("id", b.student_id).single();
+      if (studentRow?.email) {
+        await sendEmail({
+          to: studentRow.email,
+          subject: `Recordatorio: clase mañana a las ${b.start_time.slice(0,5)}`,
+          html: htmlTemplate({
+            title: `Hola ${studentRow.full_name || ""},`,
+            body: `Te recordamos que tienes una clase agendada para mañana de <strong>${b.start_time.slice(0,5)} a ${b.end_time.slice(0,5)}</strong>.`,
+            ctaText: "Ver mi calendario",
+            ctaUrl: `${process.env.URL || "https://htk-topolinos.netlify.app"}/dashboard/student`,
+          }),
+        });
+      }
     }
   } catch (e) {
     console.error("Reminder loop error:", e);
@@ -111,6 +128,21 @@ export const handler: Handler = async () => {
         p_metadata: { plan_id: p.id, days_left: daysLeft },
       });
       expiryNotifsSent++;
+
+      const { data: studentRow } = await sb
+        .from("profiles").select("email, full_name").eq("id", p.student_id).single();
+      if (studentRow?.email) {
+        await sendEmail({
+          to: studentRow.email,
+          subject: `Tu plan "${p.name}" vence en ${daysLeft} días`,
+          html: htmlTemplate({
+            title: `Hola ${studentRow.full_name || ""},`,
+            body: `Tu plan <strong>${p.name}</strong> expira en <strong>${daysLeft} días</strong>. Renueva ahora para no perder tus clases.`,
+            ctaText: "Renovar plan",
+            ctaUrl: `${process.env.URL || "https://htk-topolinos.netlify.app"}/dashboard/student?tab=pagos`,
+          }),
+        });
+      }
     }
   } catch (e) {
     console.error("Expiry loop error:", e);

@@ -203,6 +203,30 @@ export async function upsertAttendance(
 /**
  * Create booking record — usa el schema real de la tabla bookings
  */
+/**
+ * Create N bookings: 1 normal + (repeatWeeks-1) extra at +7d each.
+ * Returns count created.
+ */
+export async function createRecurringBookings(
+  studentId: string,
+  professionalId: string,
+  baseBookingDate: string,   // YYYY-MM-DD
+  startTime: string,
+  endTime: string,
+  professionalType: ProfessionalType,
+  repeatWeeks: number
+): Promise<{ success: boolean; created: number; error?: string }> {
+  let created = 0;
+  for (let w = 0; w < repeatWeeks; w++) {
+    const d = new Date(baseBookingDate + "T00:00:00");
+    d.setDate(d.getDate() + 7 * w);
+    const dateStr = d.toISOString().split("T")[0];
+    const r = await createBooking(studentId, professionalId, dateStr, startTime, endTime, professionalType);
+    if (r.success) created++;
+  }
+  return { success: created > 0, created };
+}
+
 export async function createBooking(
   studentId: string,
   professionalId: string,
@@ -1065,6 +1089,94 @@ export function canCancelBooking(
 }
 
 // ============================================
+// MESSAGING (G)
+// ============================================
+export interface MessageRow {
+  id: string;
+  sender_id: string;
+  recipient_id: string;
+  body: string;
+  read_at?: string;
+  created_at: string;
+}
+
+export interface MessageThread {
+  other_user_id: string;
+  other_user_name: string;
+  other_user_photo?: string;
+  other_user_role: string;
+  last_message: string;
+  last_message_at: string;
+  unread_count: number;
+}
+
+export async function listMessageThreads(): Promise<{
+  success: boolean; data?: MessageThread[]; error?: string;
+}> {
+  try {
+    const { data, error } = await supabase.rpc("list_message_threads");
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: (data as MessageThread[]) || [] };
+  } catch (e) { return { success: false, error: String(e) }; }
+}
+
+export async function getMessagesWith(
+  otherUserId: string
+): Promise<{ success: boolean; data?: MessageRow[]; error?: string }> {
+  try {
+    const { data: u } = await supabase.auth.getUser();
+    if (!u?.user?.id) return { success: false, error: "No autenticado" };
+    const me = u.user.id;
+    const { data, error } = await supabase
+      .from("messages").select("*")
+      .or(`and(sender_id.eq.${me},recipient_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},recipient_id.eq.${me})`)
+      .order("created_at", { ascending: true });
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: (data as MessageRow[]) || [] };
+  } catch (e) { return { success: false, error: String(e) }; }
+}
+
+export async function sendMessage(
+  recipientId: string, body: string
+): Promise<{ success: boolean; data?: MessageRow; error?: string }> {
+  try {
+    const { data: u } = await supabase.auth.getUser();
+    if (!u?.user?.id) return { success: false, error: "No autenticado" };
+    const { data, error } = await supabase
+      .from("messages")
+      .insert({ sender_id: u.user.id, recipient_id: recipientId, body })
+      .select("*").single();
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: data as MessageRow };
+  } catch (e) { return { success: false, error: String(e) }; }
+}
+
+export async function markThreadRead(otherUserId: string): Promise<{ success: boolean }> {
+  try {
+    await supabase.rpc("mark_thread_read", { p_other_id: otherUserId });
+    return { success: true };
+  } catch { return { success: false }; }
+}
+
+export function subscribeToMessagesWith(
+  myId: string, otherId: string, onNew: (m: MessageRow) => void
+): () => void {
+  const channel = supabase
+    .channel(`messages:${myId}-${otherId}`)
+    .on("postgres_changes",
+      { event: "INSERT", schema: "public", table: "messages" },
+      (payload) => {
+        const m = payload.new as MessageRow;
+        if (
+          (m.sender_id === myId && m.recipient_id === otherId) ||
+          (m.sender_id === otherId && m.recipient_id === myId)
+        ) onNew(m);
+      })
+    .subscribe();
+  return () => { supabase.removeChannel(channel); };
+}
+
+// ============================================
 // NOTIFICATIONS (B)
 // ============================================
 export type NotificationType =
@@ -1622,6 +1734,7 @@ export async function adminCreatePatient(payload: {
   email: string;
   phone?: string;
   rut_dni?: string;
+  password?: string;
   send_invite?: boolean;
 }): Promise<{ success: boolean; user_id?: string; error?: string }> {
   try {

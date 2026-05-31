@@ -1,6 +1,4 @@
 import { useState } from "react";
-import { Plus } from "lucide-react";
-import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import Sidebar from "@/components/dashboard/Sidebar";
 import DashboardTopBar from "@/components/dashboard/DashboardTopBar";
@@ -9,15 +7,16 @@ import CalendarSection from "@/components/dashboard/sections/CalendarSection";
 import PatientsSection from "@/components/dashboard/sections/PatientsSection";
 import ProfileSection from "@/components/dashboard/sections/ProfileSection";
 import AdminSection from "@/components/dashboard/sections/AdminSection";
+import MessagingPanel from "@/components/dashboard/MessagingPanel";
 
 export default function TeacherDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const initialTab = (() => {
+    const p = new URLSearchParams(window.location.search);
+    return p.get("tab") || "dashboard";
+  })();
+  const [activeTab, setActiveTab] = useState(initialTab);
   const { user, isAdmin } = useAuth();
-
-  const handleNewUser = () => {
-    toast("Crear nuevo usuario");
-  };
 
   return (
     <div className="flex h-screen bg-[#05050A] text-white overflow-hidden">
@@ -40,19 +39,12 @@ export default function TeacherDashboard() {
           {activeTab === "dashboard" && <DashboardSection />}
           {activeTab === "calendar" && <CalendarSection professionalId={user?.id || ""} />}
           {activeTab === "patients" && <PatientsSection professionalId={user?.id || ""} />}
+          {activeTab === "messages" && <MessagingPanel />}
           {activeTab === "profile" && <ProfileSection />}
           {activeTab === "admin" && isAdmin && <AdminSection />}
         </main>
       </div>
 
-      {/* Floating Action Button */}
-      <button
-        onClick={handleNewUser}
-        className="fixed bottom-6 right-6 z-40 w-12 h-12 rounded-full bg-orange-500 hover:bg-orange-400 text-white flex items-center justify-center shadow-[0_4px_20px_rgba(249,115,22,0.4)] transition-all hover:scale-105 active:scale-95"
-        aria-label="Nuevo usuario"
-      >
-        <Plus className="w-5 h-5" />
-      </button>
     </div>
   );
 }

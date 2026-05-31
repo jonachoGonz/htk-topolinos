@@ -9,6 +9,7 @@ import {
   LogOut,
   UserCircle,
   Shield,
+  MessageSquare,
   X,
 } from "lucide-react";
 
@@ -22,6 +23,7 @@ const teacherNavItems: NavItem[] = [
   { icon: LayoutDashboard, label: "Panel",        tabId: "dashboard" },
   { icon: CalendarDays,    label: "Calendario",   tabId: "calendar"  },
   { icon: Users,           label: "Pacientes",    tabId: "patients"  },
+  { icon: MessageSquare,   label: "Mensajes",     tabId: "messages"  },
   { icon: UserCircle,      label: "Mi Perfil",    tabId: "profile"   },
 ];
 
@@ -32,6 +34,7 @@ const adminNavItem: NavItem = {
 const studentNavItems: NavItem[] = [
   { icon: LayoutDashboard, label: "Panel",          tabId: "dashboard"    },
   { icon: CalendarDays,    label: "Calendario",     tabId: "calendario"   },
+  { icon: MessageSquare,   label: "Mensajes",       tabId: "messages"     },
   { icon: CreditCard,      label: "Pagos",          tabId: "pagos"        },
   { icon: Settings,        label: "Configuración",  tabId: "configuracion"},
 ];
