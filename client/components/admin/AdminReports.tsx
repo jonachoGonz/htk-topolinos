@@ -1,13 +1,17 @@
 import { useEffect, useState } from "react";
 import {
-  DollarSign, Users, Activity, CalendarClock, TrendingUp,
-  Package, Loader2, Pause, PieChart,
+  DollarSign, Users, Activity, CalendarClock,
+  Package, Loader2, Pause, PieChart as PieIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
-  getAdminOverview, getPlanDistribution,
+  getAdminOverview, getPlanDistribution, supabase,
   type AdminOverview, type PlanDistributionRow,
 } from "@/services/supabase";
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend,
+} from "recharts";
 
 function StatCard({ label, value, hint, icon, color = "cyan" }: {
   label: string; value: string | number; hint?: string;
@@ -37,18 +41,60 @@ function formatCLP(n: number) {
   return new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(n);
 }
 
+interface RevenueDay { date: string; revenue: number; }
+interface AttendanceDay { date: string; total: number; attended: number; }
+
 export default function AdminReports() {
   const [overview, setOverview] = useState<AdminOverview | null>(null);
   const [planDist, setPlanDist] = useState<PlanDistributionRow[]>([]);
+  const [revenueByDay, setRevenueByDay] = useState<RevenueDay[]>([]);
+  const [attendanceByDay, setAttendanceByDay] = useState<AttendanceDay[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const [ov, pd] = await Promise.all([getAdminOverview(), getPlanDistribution()]);
+      const [ov, pd, payments, bookings] = await Promise.all([
+        getAdminOverview(),
+        getPlanDistribution(),
+        supabase
+          .from("payments")
+          .select("amount, created_at")
+          .eq("status", "succeeded")
+          .gte("created_at", new Date(Date.now() - 30*86400000).toISOString())
+          .order("created_at"),
+        supabase
+          .from("bookings")
+          .select("booking_date, attended, attendance_confirmed_at")
+          .gte("booking_date", new Date(Date.now() - 30*86400000).toISOString().split("T")[0])
+          .order("booking_date"),
+      ]);
+
       if (ov.success) setOverview(ov.data || null);
       else toast.error(`Error: ${ov.error}`);
       if (pd.success) setPlanDist(pd.data || []);
+
+      // Aggregate payments into per-day revenue
+      const rMap: Record<string, number> = {};
+      (payments.data || []).forEach((p: any) => {
+        const d = p.created_at.split("T")[0];
+        rMap[d] = (rMap[d] || 0) + (p.amount || 0);
+      });
+      setRevenueByDay(
+        Object.entries(rMap).sort((a, b) => a[0].localeCompare(b[0]))
+          .map(([date, revenue]) => ({ date: date.slice(5), revenue }))
+      );
+
+      // Aggregate bookings by date
+      const bMap: Record<string, AttendanceDay> = {};
+      (bookings.data || []).forEach((b: any) => {
+        const d = b.booking_date;
+        if (!bMap[d]) bMap[d] = { date: d.slice(5), total: 0, attended: 0 };
+        bMap[d].total++;
+        if (b.attended === true) bMap[d].attended++;
+      });
+      setAttendanceByDay(Object.values(bMap).sort((a, b) => a.date.localeCompare(b.date)));
+
       setLoading(false);
     })();
   }, []);
@@ -130,20 +176,75 @@ export default function AdminReports() {
         />
       </div>
 
+      {/* Revenue chart (last 30 days) */}
+      <div className="bg-[#0f131a] border border-white/[0.06] rounded-xl p-4">
+        <h3 className="text-white font-semibold font-lexend text-sm mb-3">Ingresos últimos 30 días</h3>
+        {revenueByDay.length === 0 ? (
+          <p className="py-8 text-center text-gray-500 text-sm">Aún sin pagos en este período</p>
+        ) : (
+          <ResponsiveContainer width="100%" height={220}>
+            <LineChart data={revenueByDay}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" />
+              <XAxis dataKey="date" stroke="#71717a" fontSize={11} />
+              <YAxis stroke="#71717a" fontSize={11} tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
+              <Tooltip
+                contentStyle={{ background: "#0a0e1a", border: "1px solid #ffffff20", borderRadius: 8, fontSize: 12 }}
+                formatter={(v: any) => [formatCLP(v), "Ingresos"]} />
+              <Line type="monotone" dataKey="revenue" stroke="#00d4ff" strokeWidth={2} dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+
+      {/* Attendance chart */}
+      <div className="bg-[#0f131a] border border-white/[0.06] rounded-xl p-4">
+        <h3 className="text-white font-semibold font-lexend text-sm mb-3">Asistencias últimos 30 días</h3>
+        {attendanceByDay.length === 0 ? (
+          <p className="py-8 text-center text-gray-500 text-sm">Sin asistencias confirmadas</p>
+        ) : (
+          <ResponsiveContainer width="100%" height={220}>
+            <LineChart data={attendanceByDay}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" />
+              <XAxis dataKey="date" stroke="#71717a" fontSize={11} />
+              <YAxis stroke="#71717a" fontSize={11} allowDecimals={false} />
+              <Tooltip contentStyle={{ background: "#0a0e1a", border: "1px solid #ffffff20", borderRadius: 8, fontSize: 12 }} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Line type="monotone" dataKey="total" stroke="#71717a" name="Reservas" strokeWidth={2} />
+              <Line type="monotone" dataKey="attended" stroke="#10b981" name="Asistió" strokeWidth={2} />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+
       {/* Plan distribution */}
       <div className="bg-[#0f131a] border border-white/[0.06] rounded-xl overflow-hidden">
         <div className="px-5 py-4 border-b border-white/[0.06] flex items-center gap-2">
-          <PieChart className="w-4 h-4 text-[#00d4ff]" />
+          <PieIcon className="w-4 h-4 text-[#00d4ff]" />
           <h3 className="text-white font-semibold font-lexend text-sm">Distribución de planes activos</h3>
         </div>
         {planDist.length === 0 ? (
           <p className="p-8 text-center text-gray-500 text-sm">Sin planes activos aún.</p>
         ) : (
-          <div className="divide-y divide-white/[0.04]">
-            {planDist.map((p) => {
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
+            <div className="flex items-center justify-center">
+              <ResponsiveContainer width="100%" height={220}>
+                <PieChart>
+                  <Pie data={planDist} dataKey="active_subscriptions" nameKey="template_name"
+                    cx="50%" cy="50%" innerRadius={50} outerRadius={85} paddingAngle={2}>
+                    {planDist.map((_, i) => {
+                      const colors = ["#00d4ff", "#10b981", "#f59e0b", "#a855f7", "#ec4899", "#3b82f6"];
+                      return <Cell key={i} fill={colors[i % colors.length]} />;
+                    })}
+                  </Pie>
+                  <Tooltip contentStyle={{ background: "#0a0e1a", border: "1px solid #ffffff20", borderRadius: 8, fontSize: 12 }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="divide-y divide-white/[0.04]">
+              {planDist.map((p) => {
               const pct = totalPlanSubs > 0 ? Math.round((p.active_subscriptions / totalPlanSubs) * 100) : 0;
               return (
-                <div key={p.template_id} className="px-5 py-3">
+                <div key={p.template_id} className="px-3 py-2">
                   <div className="flex items-center justify-between mb-2">
                     <div>
                       <p className="text-white text-sm font-semibold">{p.template_name}</p>
@@ -161,6 +262,7 @@ export default function AdminReports() {
                 </div>
               );
             })}
+            </div>
           </div>
         )}
       </div>

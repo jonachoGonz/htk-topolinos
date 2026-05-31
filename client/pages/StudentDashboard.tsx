@@ -1,6 +1,4 @@
 import { useState, useEffect } from "react";
-import { Plus } from "lucide-react";
-import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import Sidebar from "@/components/dashboard/Sidebar";
 import StudentTopBar from "@/components/dashboard/StudentTopBar";
@@ -9,11 +7,16 @@ import StudentCalendarSection from "@/components/dashboard/sections/StudentCalen
 import StudentPaymentSection from "@/components/dashboard/sections/StudentPaymentSection";
 import StudentSettingsSection from "@/components/dashboard/sections/StudentSettingsSection";
 import OnboardingWizard from "@/components/dashboard/OnboardingWizard";
+import MessagingPanel from "@/components/dashboard/MessagingPanel";
 import { getOnboardingState } from "@/services/supabase";
 
 export default function StudentDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const initialTab = (() => {
+    const p = new URLSearchParams(window.location.search);
+    return p.get("tab") || "dashboard";
+  })();
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const { user } = useAuth();
 
@@ -23,11 +26,6 @@ export default function StudentDashboard() {
       if (r.success && r.data) setNeedsOnboarding(!r.data.completed);
     });
   }, [user?.id]);
-
-  const handleNewBooking = () => {
-    toast("Ir a calendario para crear una nueva sesión");
-    setActiveTab("calendario");
-  };
 
   return (
     <div className="flex h-screen bg-[#05050A] text-white overflow-hidden">
@@ -53,19 +51,11 @@ export default function StudentDashboard() {
         <main className="flex-1 overflow-y-auto bg-[#0a0e1a] p-5 lg:p-6">
           {activeTab === "dashboard" && <StudentDashboardSection />}
           {activeTab === "calendario" && <StudentCalendarSection studentId={user?.id || ""} />}
+          {activeTab === "messages" && <MessagingPanel />}
           {activeTab === "pagos" && <StudentPaymentSection studentId={user?.id || ""} />}
           {activeTab === "configuracion" && <StudentSettingsSection />}
         </main>
       </div>
-
-      {/* Floating Action Button */}
-      <button
-        onClick={handleNewBooking}
-        className="fixed bottom-6 right-6 z-40 w-12 h-12 rounded-full bg-orange-500 hover:bg-orange-400 text-white flex items-center justify-center shadow-[0_4px_20px_rgba(249,115,22,0.4)] transition-all hover:scale-105 active:scale-95"
-        aria-label="Nueva sesión"
-      >
-        <Plus className="w-5 h-5" />
-      </button>
 
       {/* Onboarding wizard — blocks usage until profile + PAR-Q complete */}
       {needsOnboarding && user?.id && (

@@ -54,7 +54,7 @@ export default function PatientsList(_props: PatientsListProps) {
   const [selected, setSelected] = useState<PatientProfile | null>(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [createForm, setCreateForm] = useState({
-    full_name: "", email: "", phone: "", rut_dni: "", send_invite: true,
+    full_name: "", email: "", phone: "", rut_dni: "", password: "", send_invite: false,
   });
   const [creating, setCreating] = useState(false);
   const { isAdmin } = useAuth();
@@ -92,16 +92,24 @@ export default function PatientsList(_props: PatientsListProps) {
       toast.error("Nombre y email son requeridos");
       return;
     }
+    if (!createForm.send_invite && !createForm.password.trim()) {
+      toast.error("Define una contraseña o marca 'Enviar invitación por email'");
+      return;
+    }
+    if (createForm.password && createForm.password.length < 6) {
+      toast.error("La contraseña debe tener al menos 6 caracteres");
+      return;
+    }
     setCreating(true);
     const r = await adminCreatePatient(createForm);
     if (r.success) {
       toast.success(
         createForm.send_invite
           ? `Paciente creado. Email de invitación enviado a ${createForm.email}`
-          : `Paciente creado. Email: ${createForm.email}`
+          : `Paciente creado. Email: ${createForm.email} / Contraseña: ${createForm.password}`
       );
       setCreateModalOpen(false);
-      setCreateForm({ full_name: "", email: "", phone: "", rut_dni: "", send_invite: true });
+      setCreateForm({ full_name: "", email: "", phone: "", rut_dni: "", password: "", send_invite: false });
       fetchAll();
     } else {
       toast.error(`Error: ${r.error}`);
@@ -310,14 +318,34 @@ export default function PatientsList(_props: PatientsListProps) {
                   onChange={(v) => setCreateForm({ ...createForm, rut_dni: v })} />
               </Field>
 
+              {!createForm.send_invite && (
+                <Field label="Contraseña inicial * (mín. 6 caracteres)">
+                  <Input
+                    type="text"
+                    value={createForm.password}
+                    onChange={(v) => setCreateForm({ ...createForm, password: v })}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setCreateForm({
+                      ...createForm,
+                      password: "HTK-" + Math.random().toString(36).slice(2, 8).toUpperCase(),
+                    })}
+                    className="text-[10px] text-[#00d4ff] hover:text-cyan-300 transition mt-1"
+                  >
+                    Generar contraseña aleatoria
+                  </button>
+                </Field>
+              )}
+
               <label className="flex items-start gap-2 pt-2 cursor-pointer">
                 <input type="checkbox" checked={createForm.send_invite}
-                  onChange={(e) => setCreateForm({ ...createForm, send_invite: e.target.checked })}
+                  onChange={(e) => setCreateForm({ ...createForm, send_invite: e.target.checked, password: "" })}
                   className="mt-0.5" />
                 <span className="text-xs text-gray-300">
-                  <strong>Enviar email de invitación</strong>
+                  <strong>Enviar email de invitación en vez de contraseña</strong>
                   <span className="block text-gray-500 mt-0.5">
-                    El paciente recibirá un link para crear su contraseña. Si lo desmarcas, se creará con contraseña temporal aleatoria.
+                    El paciente recibirá un link por email para crear su propia contraseña.
                   </span>
                 </span>
               </label>

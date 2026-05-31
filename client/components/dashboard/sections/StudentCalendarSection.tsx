@@ -6,6 +6,7 @@ import {
   getStudentAvailability,
   getStudentBookings,
   createBooking,
+  createRecurringBookings,
   cancelBooking,
   getAllProfessionals,
   getRemainingPlanClasses,
@@ -120,6 +121,7 @@ export default function StudentCalendarSection({
   const [modalLoading, setModalLoading] = useState(false);
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
+  const [repeatWeeks, setRepeatWeeks] = useState(1);
 
   const { user } = useAuth();
   const weekDays = buildWeekDays(weekStart);
@@ -318,37 +320,45 @@ export default function StudentCalendarSection({
 
     setModalLoading(true);
     try {
-      const result = await createBooking(
-        user.id,
-        professionalId,
-        bookingDate,
-        selectedSlot.startTime,
-        selectedSlot.endTime,
-        selectedSlot.professionalType ?? "kinesiologist"
-      );
-
-      if (result.success) {
-        setSlots((prev) =>
-          prev.map((s) =>
-            s.id === selectedSlotId
-              ? { ...s, userBooked: true, booked: s.booked + 1 }
-              : s
-          )
+      if (repeatWeeks > 1) {
+        const r = await createRecurringBookings(
+          user.id, professionalId, bookingDate,
+          selectedSlot.startTime, selectedSlot.endTime,
+          selectedSlot.professionalType ?? "kinesiologist",
+          repeatWeeks
         );
-        // Don't decrement plan on booking — only on attendance confirmation.
-        // But show informative toast.
-        if (selectedSlot.professionalType === "nutritionist") {
-          toast.success(
-            `Sesión de nutrición agendada (${selectedSlot.startTime}–${selectedSlot.endTime}). No consume del plan.`
-          );
+        if (r.success) {
+          toast.success(`${r.created} sesiones agendadas en las próximas ${repeatWeeks} semanas`);
+          setModalOpen(false);
+          setRepeatWeeks(1);
+          fetchData();
         } else {
-          toast.success(
-            `Sesión agendada (${selectedSlot.startTime}–${selectedSlot.endTime}). Se descontará del plan al confirmar tu asistencia.`
-          );
+          toast.error(`No se pudo agendar: ${r.error || "desconocido"}`);
         }
-        setModalOpen(false);
       } else {
-        toast.error(`Error al agendar: ${result.error}`);
+        const result = await createBooking(
+          user.id, professionalId, bookingDate,
+          selectedSlot.startTime, selectedSlot.endTime,
+          selectedSlot.professionalType ?? "kinesiologist"
+        );
+
+        if (result.success) {
+          setSlots((prev) =>
+            prev.map((s) =>
+              s.id === selectedSlotId
+                ? { ...s, userBooked: true, booked: s.booked + 1 }
+                : s
+            )
+          );
+          if (selectedSlot.professionalType === "nutritionist") {
+            toast.success(`Sesión de nutrición agendada (${selectedSlot.startTime}–${selectedSlot.endTime}). No consume del plan.`);
+          } else {
+            toast.success(`Sesión agendada (${selectedSlot.startTime}–${selectedSlot.endTime}). Se descontará al confirmar asistencia.`);
+          }
+          setModalOpen(false);
+        } else {
+          toast.error(`Error al agendar: ${result.error}`);
+        }
       }
     } catch {
       toast.error("Error inesperado al agendar sesión.");
@@ -634,30 +644,69 @@ export default function StudentCalendarSection({
         </div>
       </div>
 
+      {/* Booking modal with optional recurring */}
+      {modalOpen && modalAction === "book" && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50"
+          onClick={() => !modalLoading && handleModalClose()}>
+          <div className="bg-[#0a0e1a] border border-white/10 rounded-xl max-w-md w-full p-5 space-y-4"
+            onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-white font-montserrat">Confirmar agendamiento</h3>
+            <p className="text-sm text-gray-300">
+              {selectedSlot?.professionalType === "nutritionist"
+                ? `Sesión de Nutrición ${selectedSlot?.startTime} a ${selectedSlot?.endTime}. No consume del plan.`
+                : `Sesión ${selectedSlot?.startTime}–${selectedSlot?.endTime}. Se descontará del plan al confirmar asistencia.`}
+            </p>
+
+            {selectedSlot?.professionalType !== "nutritionist" && (
+              <div className="bg-[#0f131a] border border-white/[0.06] rounded-lg p-3 space-y-2">
+                <label className="block text-[10px] uppercase tracking-wider text-gray-500 font-semibold">
+                  Repetir esta misma hora durante:
+                </label>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {[1, 2, 4, 8].map((n) => (
+                    <button key={n} type="button" onClick={() => setRepeatWeeks(n)}
+                      className={`py-1.5 rounded text-xs font-semibold transition ${
+                        repeatWeeks === n
+                          ? "bg-[#00d4ff]/15 border border-[#00d4ff]/40 text-[#00d4ff]"
+                          : "bg-[#0a0e1a] border border-white/10 text-gray-400 hover:text-white"
+                      }`}>
+                      {n === 1 ? "1 vez" : `${n} sem`}
+                    </button>
+                  ))}
+                </div>
+                {repeatWeeks > 1 && (
+                  <p className="text-[10px] text-amber-300">
+                    Se crearán {repeatWeeks} reservas (una por semana). Asegúrate de tener {repeatWeeks} clases en tu plan.
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div className="flex gap-2 justify-end pt-2">
+              <button onClick={handleModalClose} disabled={modalLoading}
+                className="px-4 py-2 rounded-lg bg-white/[0.05] border border-white/10 text-white text-sm font-semibold hover:bg-white/[0.08] transition disabled:opacity-40">
+                Volver
+              </button>
+              <button onClick={handleConfirmBook} disabled={modalLoading}
+                className="px-4 py-2 rounded-lg bg-[#00d4ff] hover:bg-cyan-300 text-[#05050A] text-sm font-bold transition disabled:opacity-40">
+                {modalLoading ? "Procesando…" : repeatWeeks > 1 ? `Agendar ${repeatWeeks} sesiones` : "Agendar sesión"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel modal stays as ConfirmationModal */}
       <ConfirmationModal
-        isOpen={modalOpen}
-        title={
-          modalAction === "book"
-            ? "Confirmar Agendamiento"
-            : "Confirmar Cancelación"
-        }
-        message={
-          modalAction === "book"
-            ? selectedSlot?.professionalType === "nutritionist"
-              ? `Sesión de Nutrición ${selectedSlot?.startTime} a ${selectedSlot?.endTime}. No consume del plan; se cobra por separado.`
-              : `¿Deseas agendar la sesión de ${selectedSlot?.startTime} a ${selectedSlot?.endTime}? Se descontará 1 clase de tu plan al confirmar asistencia.`
-            : `¿Estás seguro de que deseas cancelar la sesión de ${selectedSlot?.startTime} a ${selectedSlot?.endTime}? Cancelaciones con menos de ${minCancelHours}h no son reembolsables.`
-        }
-        confirmLabel={
-          modalAction === "book" ? "Agendar Sesión" : "Cancelar Sesión"
-        }
+        isOpen={modalOpen && modalAction === "cancel"}
+        title="Confirmar Cancelación"
+        message={`¿Estás seguro de que deseas cancelar la sesión de ${selectedSlot?.startTime} a ${selectedSlot?.endTime}? Cancelaciones con menos de ${minCancelHours}h no son reembolsables.`}
+        confirmLabel="Cancelar Sesión"
         cancelLabel="Volver"
-        isDangerous={modalAction === "cancel"}
+        isDangerous
         isLoading={modalLoading}
-        icon={modalAction === "book" ? "info" : "warning"}
-        onConfirm={
-          modalAction === "book" ? handleConfirmBook : handleConfirmCancel
-        }
+        icon="warning"
+        onConfirm={handleConfirmCancel}
         onCancel={handleModalClose}
       />
     </div>
