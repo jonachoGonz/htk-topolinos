@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Save, Loader2, Settings as SettingsIcon, Building, Clock, CreditCard, MessageSquare } from "lucide-react";
+import { Save, Loader2, Settings as SettingsIcon, Building, Clock, CreditCard, MessageSquare, Instagram, Music2 } from "lucide-react";
 import { toast } from "sonner";
 import { getAppSettings, updateAppSettings, type AppSettings } from "@/services/supabase";
 
@@ -81,6 +81,9 @@ export default function AdminSettings() {
           <Field label="Dirección" full>
             <Input value={form.center_address || ""} onChange={(v) => set("center_address", v)} />
           </Field>
+          <Field label="Tagline / lema" full>
+            <Input value={form.tagline || ""} onChange={(v) => set("tagline", v)} placeholder="Excelencia en deporte y kinesiología..." />
+          </Field>
           <Field label="Color primario">
             <div className="flex gap-2 items-center">
               <input type="color" value={form.primary_color || "#00d4ff"}
@@ -88,6 +91,27 @@ export default function AdminSettings() {
                 className="w-12 h-9 rounded border border-white/10 bg-transparent cursor-pointer" />
               <Input value={form.primary_color || ""} onChange={(v) => set("primary_color", v)} />
             </div>
+          </Field>
+        </Grid>
+      </Section>
+
+      {/* Social / Contact */}
+      <Section title="Redes sociales y contacto público" icon={<Instagram className="w-4 h-4 text-[#00d4ff]" />}>
+        <Grid>
+          <Field label="WhatsApp">
+            <Input value={form.whatsapp_phone || ""} onChange={(v) => set("whatsapp_phone", v)} placeholder="+56994748507" />
+          </Field>
+          <Field label="Instagram URL">
+            <Input value={form.instagram_url || ""} onChange={(v) => set("instagram_url", v)} placeholder="https://instagram.com/htk_center" />
+          </Field>
+          <Field label="TikTok usuario">
+            <Input value={form.tiktok_handle || ""} onChange={(v) => set("tiktok_handle", v)} placeholder="HTK.center" />
+          </Field>
+          <Field label="Facebook URL">
+            <Input value={form.facebook_url || ""} onChange={(v) => set("facebook_url", v)} placeholder="https://facebook.com/..." />
+          </Field>
+          <Field label="Google Maps URL" full>
+            <Input value={form.google_maps_url || ""} onChange={(v) => set("google_maps_url", v)} placeholder="https://maps.google.com/?q=..." />
           </Field>
         </Grid>
       </Section>
