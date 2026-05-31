@@ -5,8 +5,14 @@ publish = "dist/spa"
 
 
 [functions]
-external_node_modules = ["express"]
+external_node_modules = ["express", "stripe", "@supabase/supabase-js"]
 node_bundler = "esbuild"
+
+# Hourly reminders + expiry warnings
+[[scheduled.functions]]
+name = "send-reminders"
+schedule = "@hourly"
+
 [[redirects]]
 force = true
 from = "/api/*"
