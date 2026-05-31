@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Edit2, Trash2, Star, X, Save, DollarSign } from "lucide-react";
+import { Plus, Edit2, Trash2, Star, X, Save, DollarSign, Eye, EyeOff, ArrowUp, ArrowDown, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import {
   getPlanTemplates,
@@ -40,6 +40,10 @@ const emptyPlan = (): Omit<PlanTemplate, "id" | "created_at" | "updated_at"> => 
   session_type: null,
   is_active: true,
   is_default: false,
+  show_on_landing: true,
+  display_order: 100,
+  highlight: false,
+  badge_text: null,
 });
 
 export default function AdminPlansManager() {
@@ -85,8 +89,35 @@ export default function AdminPlansManager() {
       session_type: p.session_type ?? null,
       is_active: p.is_active,
       is_default: p.is_default,
+      show_on_landing: p.show_on_landing ?? true,
+      display_order: p.display_order ?? 100,
+      highlight: p.highlight ?? false,
+      badge_text: p.badge_text ?? null,
     });
     setShowForm(true);
+  };
+
+  const toggleVisibility = async (p: PlanTemplate) => {
+    const r = await updatePlanTemplate(p.id, { show_on_landing: !p.show_on_landing });
+    if (r.success) {
+      toast.success(p.show_on_landing ? "Plan oculto en la web" : "Plan visible en la web");
+      fetchPlans();
+    } else toast.error(`Error: ${r.error}`);
+  };
+
+  const reorder = async (p: PlanTemplate, direction: "up" | "down") => {
+    const sorted = [...plans].sort(
+      (a, b) => (a.display_order ?? 100) - (b.display_order ?? 100)
+    );
+    const idx = sorted.findIndex((x) => x.id === p.id);
+    if (idx < 0) return;
+    const swap = direction === "up" ? sorted[idx - 1] : sorted[idx + 1];
+    if (!swap) return;
+    const aOrder = p.display_order ?? 100;
+    const bOrder = swap.display_order ?? 100;
+    await updatePlanTemplate(p.id, { display_order: bOrder });
+    await updatePlanTemplate(swap.id, { display_order: aOrder });
+    fetchPlans();
   };
 
   const closeForm = () => {
@@ -202,6 +233,8 @@ export default function AdminPlansManager() {
                   <th className="px-6 py-3">Renovación</th>
                   <th className="px-6 py-3">Sesiones</th>
                   <th className="px-6 py-3">Descuentos</th>
+                  <th className="px-6 py-3">Web</th>
+                  <th className="px-6 py-3">Orden</th>
                   <th className="px-6 py-3">Estado</th>
                   <th className="px-6 py-3">Acciones</th>
                 </tr>
@@ -246,6 +279,32 @@ export default function AdminPlansManager() {
                       ) : (
                         "—"
                       )}
+                    </td>
+                    <td className="px-6 py-3">
+                      <button
+                        onClick={() => toggleVisibility(p)}
+                        title={p.show_on_landing ? "Ocultar de la web" : "Mostrar en la web"}
+                        className={`p-1.5 rounded transition ${
+                          p.show_on_landing
+                            ? "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+                            : "bg-zinc-500/10 text-zinc-500 hover:bg-zinc-500/20"
+                        }`}
+                      >
+                        {p.show_on_landing ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                      </button>
+                    </td>
+                    <td className="px-6 py-3">
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => reorder(p, "up")}
+                          className="p-1 rounded hover:bg-white/10 text-gray-400">
+                          <ArrowUp className="w-3.5 h-3.5" />
+                        </button>
+                        <span className="text-xs text-gray-400 w-6 text-center">{p.display_order ?? 100}</span>
+                        <button onClick={() => reorder(p, "down")}
+                          className="p-1 rounded hover:bg-white/10 text-gray-400">
+                          <ArrowDown className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </td>
                     <td className="px-6 py-3">
                       <span
@@ -511,28 +570,49 @@ export default function AdminPlansManager() {
                 )}
               </div>
 
-              {/* Active + Default */}
-              <div className="flex items-center gap-6">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={form.is_active}
-                    onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
-                    className="rounded"
-                  />
-                  <span className="text-sm text-white font-inter">Activo</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={form.is_default}
-                    onChange={(e) => setForm({ ...form, is_default: e.target.checked })}
-                    className="rounded"
-                  />
-                  <span className="text-sm text-white font-inter">
-                    Plan por defecto (asignado a nuevos alumnos)
-                  </span>
-                </label>
+              {/* Active + Default + Landing visibility */}
+              <div className="space-y-3 pt-2 border-t border-white/[0.06]">
+                <div className="flex items-center gap-6 flex-wrap">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={form.is_active}
+                      onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
+                      className="rounded" />
+                    <span className="text-sm text-white">Activo</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={form.is_default}
+                      onChange={(e) => setForm({ ...form, is_default: e.target.checked })}
+                      className="rounded" />
+                    <span className="text-sm text-white">
+                      Plan por defecto (asignado a nuevos alumnos)
+                    </span>
+                  </label>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-3 rounded-lg bg-[#0a0e1a] border border-white/[0.04]">
+                  <label className="flex items-center gap-2 cursor-pointer text-sm text-white">
+                    <input type="checkbox" checked={form.show_on_landing ?? true}
+                      onChange={(e) => setForm({ ...form, show_on_landing: e.target.checked })} />
+                    <Eye className="w-3.5 h-3.5 text-emerald-400" /> Mostrar en la web
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer text-sm text-white">
+                    <input type="checkbox" checked={form.highlight ?? false}
+                      onChange={(e) => setForm({ ...form, highlight: e.target.checked })} />
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Destacar en la web
+                  </label>
+                  <Field label="Orden (menor = primero)">
+                    <input type="number" value={String(form.display_order ?? 100)}
+                      onChange={(e) => setForm({ ...form, display_order: parseInt(e.target.value) || 100 })}
+                      className="w-full bg-[#0f131a] border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-[#00d4ff]/40" />
+                  </Field>
+                </div>
+                {form.highlight && (
+                  <Field label="Texto del badge (opcional)">
+                    <input value={form.badge_text || ""}
+                      onChange={(e) => setForm({ ...form, badge_text: e.target.value })}
+                      placeholder="Ej: Más popular, Recomendado"
+                      className="w-full bg-[#0f131a] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#00d4ff]/40" />
+                  </Field>
+                )}
               </div>
             </div>
 

@@ -58,7 +58,7 @@ export default function Services() {
   return (
     <>
       {/* Core Services */}
-      <section className="w-full bg-[#0f1420] py-20 sm:py-32">
+      <section id="servicios" className="w-full bg-[#0f1420] py-12 sm:py-16 lg:py-24">
         <div className="max-w-6xl mx-auto px-5">
           <div className="text-center mb-12">
             <h2 className="text-3xl sm:text-4xl font-bold leading-tight mb-4">
@@ -99,7 +99,7 @@ export default function Services() {
       </section>
 
       {/* Specialties Section */}
-      <section className="w-full bg-[#0a0e1a] py-20 sm:py-32">
+      <section className="w-full bg-[#0a0e1a] py-12 sm:py-16 lg:py-24">
         <div className="max-w-6xl mx-auto px-5">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
             {specialties.map((specialty) => {

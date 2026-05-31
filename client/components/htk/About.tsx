@@ -26,7 +26,7 @@ export default function About() {
   return (
     <>
       {/* Stats Section */}
-      <section className="w-full bg-[#0a0e1a] py-20 sm:py-32">
+      <section id="about" className="w-full bg-[#0a0e1a] py-12 sm:py-16 lg:py-24">
         <div className="max-w-6xl mx-auto px-5">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
             {stats.map((stat) => (
@@ -44,7 +44,7 @@ export default function About() {
       </section>
 
       {/* About Section */}
-      <section className="w-full bg-[#0f1420] py-20 sm:py-32">
+      <section className="w-full bg-[#0f1420] py-12 sm:py-16 lg:py-24">
         <div className="max-w-6xl mx-auto px-5">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-16 items-center">
             {/* Image */}
@@ -96,7 +96,7 @@ export default function About() {
       </section>
 
       {/* Facilities Showcase */}
-      <section className="w-full bg-[#0f1420] py-20 sm:py-32">
+      <section className="w-full bg-[#0f1420] py-12 sm:py-16 lg:py-24">
         <div className="max-w-6xl mx-auto px-5">
           <div className="text-center mb-12">
             <p className="text-xs uppercase font-semibold text-cyan-400 tracking-widest mb-4">

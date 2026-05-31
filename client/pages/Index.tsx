@@ -4,6 +4,7 @@ import Services from "@/components/htk/Services";
 import About from "@/components/htk/About";
 import Pricing from "@/components/htk/Pricing";
 import Footer from "@/components/htk/Footer";
+import WhatsAppFloat from "@/components/htk/WhatsAppFloat";
 
 export default function Index() {
   return (
@@ -14,6 +15,7 @@ export default function Index() {
       <About />
       <Pricing />
       <Footer />
+      <WhatsAppFloat />
     </div>
   );
 }

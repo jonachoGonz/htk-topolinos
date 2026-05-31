@@ -1384,13 +1384,23 @@ export interface AppSettings {
   center_email?: string;
   logo_url?: string;
   primary_color?: string;
+  tagline?: string;
+  // Social / contact
+  instagram_url?: string;
+  tiktok_handle?: string;
+  facebook_url?: string;
+  whatsapp_phone?: string;
+  google_maps_url?: string;
+  // Policies
   cancellation_hours?: number;
   default_class_capacity?: number;
   default_plan_duration_months?: number;
-  operating_hours?: Record<string, [string, string]>; // {mon:[09:00,18:00]}
+  operating_hours?: Record<string, [string, string]>;
+  // Messages
   welcome_message_student?: string;
   welcome_message_teacher?: string;
   email_reminder_hours_before?: number;
+  // Payments
   stripe_publishable_key?: string;
   stripe_account_country?: string;
   default_currency?: string;
@@ -1968,8 +1978,29 @@ export interface PlanTemplate {
   session_type?: SessionType | null;
   is_active: boolean;
   is_default: boolean;
+  show_on_landing?: boolean;
+  display_order?: number;
+  highlight?: boolean;
+  badge_text?: string | null;
   created_at?: string;
   updated_at?: string;
+}
+
+/** Public: fetch active + visible plans for the landing page, ordered. */
+export async function getPublicPlans(): Promise<{
+  success: boolean; data?: PlanTemplate[]; error?: string;
+}> {
+  try {
+    const { data, error } = await supabase
+      .from("plan_templates")
+      .select("*")
+      .eq("is_active", true)
+      .eq("show_on_landing", true)
+      .order("display_order", { ascending: true })
+      .order("created_at", { ascending: true });
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: (data as PlanTemplate[]) || [] };
+  } catch (e) { return { success: false, error: String(e) }; }
 }
 
 export async function getPlanTemplates(
