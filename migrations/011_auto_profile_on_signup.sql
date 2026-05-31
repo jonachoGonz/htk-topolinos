@@ -3,6 +3,15 @@
 -- Purpose: Fix issue where students sign up via auth.users but no profile row exists
 
 -- ===================================================================
+-- 0. Safety net — make sure columns referenced below exist
+--    (email was added in migration 007 but some users had partial-apply)
+-- ===================================================================
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS email TEXT,
+  ADD COLUMN IF NOT EXISTS phone TEXT,
+  ADD COLUMN IF NOT EXISTS rut_dni TEXT;
+
+-- ===================================================================
 -- 1. Trigger: create profile when auth.users gets a new row
 -- ===================================================================
 CREATE OR REPLACE FUNCTION public.handle_new_auth_user()
