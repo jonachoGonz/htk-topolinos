@@ -4,6 +4,21 @@
 --          D (Dashboards) needs no schema — uses existing data.
 
 -- ===================================================================
+-- 0. Safety net — make sure columns from migrations 003/007 exist
+--    (some users reported partial-apply; these are idempotent ADD IF NOT EXISTS)
+-- ===================================================================
+ALTER TABLE profiles
+  ADD COLUMN IF NOT EXISTS is_paused BOOLEAN DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS paused_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS pause_reason TEXT,
+  ADD COLUMN IF NOT EXISTS paused_by UUID,
+  ADD COLUMN IF NOT EXISTS pause_resume_at TIMESTAMPTZ;
+ALTER TABLE bookings
+  ADD COLUMN IF NOT EXISTS attended BOOLEAN,
+  ADD COLUMN IF NOT EXISTS attendance_confirmed_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS charged_from_plan BOOLEAN DEFAULT FALSE;
+
+-- ===================================================================
 -- 1. Teacher-specific fields on profiles
 -- ===================================================================
 ALTER TABLE profiles
