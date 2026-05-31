@@ -17,6 +17,7 @@ import {
 } from "@/services/supabase";
 import SlotCard, { type TimeSlot } from "@/components/dashboard/SlotCard";
 import ConfirmationModal from "@/components/dashboard/ConfirmationModal";
+import ProfessionalCard from "@/components/dashboard/ProfessionalCard";
 import {
   getCancellationPolicy,
   type CancellationPolicy,
@@ -513,6 +514,16 @@ export default function StudentCalendarSection({
           </select>
         </div>
       </div>
+
+      {/* Selected professional card */}
+      {selectedProfessionalId !== "all" && (() => {
+        const prof = professionals.find((p) => p.id === selectedProfessionalId);
+        return prof ? (
+          <div className="mb-5">
+            <ProfessionalCard professional={prof as any} />
+          </div>
+        ) : null;
+      })()}
 
       {/* Nutritionist info banner */}
       {selectedType === "nutritionist" && (

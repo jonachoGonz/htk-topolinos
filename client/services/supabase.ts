@@ -1065,6 +1065,536 @@ export function canCancelBooking(
 }
 
 // ============================================
+// APP SETTINGS (singleton)
+// ============================================
+
+export interface AppSettings {
+  id: number;
+  center_name?: string;
+  center_address?: string;
+  center_phone?: string;
+  center_email?: string;
+  logo_url?: string;
+  primary_color?: string;
+  cancellation_hours?: number;
+  default_class_capacity?: number;
+  default_plan_duration_months?: number;
+  operating_hours?: Record<string, [string, string]>; // {mon:[09:00,18:00]}
+  welcome_message_student?: string;
+  welcome_message_teacher?: string;
+  email_reminder_hours_before?: number;
+  stripe_publishable_key?: string;
+  stripe_account_country?: string;
+  default_currency?: string;
+  extras?: Record<string, any>;
+  updated_at?: string;
+}
+
+export async function getAppSettings(): Promise<{
+  success: boolean; data?: AppSettings; error?: string;
+}> {
+  try {
+    const { data, error } = await supabase
+      .from("app_settings").select("*").eq("id", 1).single();
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: data as AppSettings };
+  } catch (e) { return { success: false, error: String(e) }; }
+}
+
+export async function updateAppSettings(
+  patch: Partial<AppSettings>
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const row: any = { ...patch, updated_at: new Date().toISOString() };
+    delete row.id;
+    const { error } = await supabase.from("app_settings").update(row).eq("id", 1);
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (e) { return { success: false, error: String(e) }; }
+}
+
+// ============================================
+// DASHBOARD VIEWS (D)
+// ============================================
+export interface TodayOverview {
+  professional_id: string;
+  today_count: number;
+  today_pending_attendance: number;
+  week_count: number;
+  active_students_30d: number;
+}
+export async function getTodayOverview(professionalId: string): Promise<{
+  success: boolean; data?: TodayOverview; error?: string;
+}> {
+  try {
+    const { data, error } = await supabase
+      .from("today_overview").select("*")
+      .eq("professional_id", professionalId).single();
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: data as TodayOverview };
+  } catch (e) { return { success: false, error: String(e) }; }
+}
+
+export interface AdminOverview {
+  total_students: number;
+  paused_students: number;
+  active_students: number;
+  total_teachers: number;
+  active_plans: number;
+  bookings_next_7_days: number;
+  bookings_this_month: number;
+  attended_this_month: number;
+  revenue_this_month: number;
+}
+export async function getAdminOverview(): Promise<{
+  success: boolean; data?: AdminOverview; error?: string;
+}> {
+  try {
+    const { data, error } = await supabase
+      .from("admin_overview").select("*").single();
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: data as AdminOverview };
+  } catch (e) { return { success: false, error: String(e) }; }
+}
+
+export interface PlanDistributionRow {
+  template_id: string;
+  template_name: string;
+  monthly_classes: number;
+  active_subscriptions: number;
+  total_remaining_sessions: number;
+}
+export async function getPlanDistribution(): Promise<{
+  success: boolean; data?: PlanDistributionRow[]; error?: string;
+}> {
+  try {
+    const { data, error } = await supabase
+      .from("plan_distribution").select("*");
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: (data as PlanDistributionRow[]) || [] };
+  } catch (e) { return { success: false, error: String(e) }; }
+}
+
+// ============================================
+// TEACHER PROFILE (C)
+// ============================================
+export interface Certification {
+  title: string;
+  issuer?: string;
+  year?: number;
+  url?: string;
+}
+export interface SocialLinks {
+  instagram?: string;
+  linkedin?: string;
+  web?: string;
+}
+export interface TeacherProfile extends Partial<PatientProfile> {
+  bio?: string;
+  years_experience?: number;
+  education?: string;
+  certifications?: Certification[];
+  specialties?: string[];
+  languages?: string[];
+  social_links?: SocialLinks;
+  show_in_directory?: boolean;
+}
+
+export async function getTeacherProfile(id: string): Promise<{
+  success: boolean; data?: TeacherProfile; error?: string;
+}> {
+  try {
+    const { data, error } = await supabase.from("profiles").select("*")
+      .eq("id", id).single();
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: data as TeacherProfile };
+  } catch (e) { return { success: false, error: String(e) }; }
+}
+
+export async function updateTeacherProfile(
+  id: string, patch: Partial<TeacherProfile>
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const row: any = { ...patch, updated_at: new Date().toISOString() };
+    delete row.id; delete row.role; delete row.is_admin;
+    const { error } = await supabase.from("profiles").update(row).eq("id", id);
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (e) { return { success: false, error: String(e) }; }
+}
+
+export async function getProfessionalsDirectory(): Promise<{
+  success: boolean; data?: TeacherProfile[]; error?: string;
+}> {
+  try {
+    const { data, error } = await supabase.from("profiles")
+      .select("id, full_name, photo_url, bio, professional_type, specialties, years_experience, languages, social_links")
+      .eq("role", "teacher").eq("show_in_directory", true)
+      .order("full_name");
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: (data as TeacherProfile[]) || [] };
+  } catch (e) { return { success: false, error: String(e) }; }
+}
+
+// ============================================
+// PATIENT MANAGEMENT
+// ============================================
+
+export type Handedness = "diestro" | "zurdo" | "ambidiestro";
+export type ActivityLevel =
+  | "sedentario" | "ligero" | "moderado" | "activo" | "muy_activo" | "atleta";
+export type BloodType =
+  | "A+" | "A-" | "B+" | "B-" | "AB+" | "AB-" | "O+" | "O-";
+export type MaritalStatus =
+  | "soltero" | "casado" | "conviviente" | "divorciado" | "viudo" | "otro";
+
+export interface SportEntry {
+  name: string;
+  since?: string; // YYYY-MM or YYYY
+  frequency_per_week?: number;
+}
+export interface SubstanceEntry {
+  name: string;
+  frequency?: string;
+  since?: string;
+}
+export interface MedicationEntry {
+  name: string;
+  dose?: string;
+  frequency?: string;
+  since?: string;
+}
+
+export interface PatientProfile {
+  id: string;
+  full_name: string;
+  email?: string;
+  rut_dni?: string;
+  birth_date?: string;
+  gender?: string;
+  marital_status?: MaritalStatus | string;
+  has_children?: boolean;
+  num_children?: number;
+  phone?: string;
+  address?: string;
+  profession?: string;
+  occupation?: string;
+  photo_url?: string;
+  height_cm?: number;
+  weight_kg?: number;
+  body_fat_pct?: number;
+  muscle_mass_pct?: number;
+  bone_mass_pct?: number;
+  // Body measurements (circumferences)
+  waist_cm?: number;
+  hip_cm?: number;
+  chest_cm?: number;
+  arm_cm?: number;
+  thigh_cm?: number;
+  calf_cm?: number;
+  // PAR-Q
+  parq_completed_at?: string;
+  parq_answers?: Record<string, boolean>;
+  parq_cleared?: boolean;
+  parq_clearance_notes?: string;
+  activity_level?: ActivityLevel | string;
+  objective?: string;
+  handedness?: Handedness | string;
+  blood_type?: BloodType | string;
+  allergies?: string;
+  diseases?: string[];
+  surgeries?: string;
+  ailments?: string;
+  injuries?: string;
+  sports?: SportEntry[];
+  drugs?: SubstanceEntry[];
+  medications?: MedicationEntry[];
+  emergency_contact_name?: string;
+  emergency_contact_phone?: string;
+  emergency_contact_relation?: string;
+  medical_info_extra?: string;
+  personal_info_extra?: string;
+  insurer?: string;
+  joined_at?: string;
+  referral_source?: string;
+  informed_consent_signed?: boolean;
+  is_paused?: boolean;
+  paused_at?: string;
+  pause_reason?: string;
+  pause_resume_at?: string;
+  role?: "student" | "teacher";
+  is_admin?: boolean;
+  professional_type?: ProfessionalType;
+}
+
+const PATIENT_FIELDS = `
+  id, full_name, email, rut_dni, birth_date, gender, marital_status,
+  has_children, num_children, phone, address, profession, occupation, photo_url,
+  height_cm, weight_kg, body_fat_pct, muscle_mass_pct, bone_mass_pct,
+  waist_cm, hip_cm, chest_cm, arm_cm, thigh_cm, calf_cm,
+  parq_completed_at, parq_answers, parq_cleared, parq_clearance_notes,
+  activity_level, objective, handedness,
+  blood_type, allergies, diseases, surgeries, ailments, injuries,
+  sports, drugs, medications,
+  emergency_contact_name, emergency_contact_phone, emergency_contact_relation,
+  medical_info_extra, personal_info_extra,
+  insurer, joined_at, referral_source, informed_consent_signed,
+  is_paused, paused_at, pause_reason, pause_resume_at,
+  role, is_admin, professional_type
+`;
+
+export async function getPatient(
+  id: string
+): Promise<{ success: boolean; data?: PatientProfile; error?: string }> {
+  try {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select(PATIENT_FIELDS)
+      .eq("id", id)
+      .single();
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: data as PatientProfile };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+}
+
+export async function getAllPatients(): Promise<{
+  success: boolean;
+  data?: PatientProfile[];
+  error?: string;
+}> {
+  try {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select(PATIENT_FIELDS)
+      .eq("role", "student")
+      .order("full_name", { ascending: true });
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: (data as PatientProfile[]) || [] };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+}
+
+export async function updatePatient(
+  id: string,
+  updates: Partial<PatientProfile>
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const row: any = { ...updates, updated_at: new Date().toISOString() };
+    // Strip read-only fields
+    delete row.id;
+    delete row.role;
+    delete row.is_admin;
+    const { error } = await supabase.from("profiles").update(row).eq("id", id);
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+}
+
+export async function createPatientProfile(
+  payload: { id?: string; full_name: string; email?: string; rut_dni?: string; phone?: string }
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const id = payload.id || crypto.randomUUID();
+    const { data, error } = await supabase.rpc("admin_upsert_patient", {
+      p_id: id,
+      p_full_name: payload.full_name,
+      p_email: payload.email || null,
+      p_rut_dni: payload.rut_dni || null,
+      p_phone: payload.phone || null,
+    });
+    if (error) return { success: false, error: error.message };
+    if (data && data.success === false)
+      return { success: false, error: data.error };
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+}
+
+export async function deletePatient(
+  id: string
+): Promise<{ success: boolean; error?: string }> {
+  // Soft delete: pause and mark inactive in any plans
+  try {
+    await supabase
+      .from("plans")
+      .update({ is_active: false })
+      .eq("student_id", id);
+
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        is_paused: true,
+        pause_reason: "Eliminado por admin",
+        paused_at: new Date().toISOString(),
+      })
+      .eq("id", id);
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+}
+
+export async function setPatientPause(
+  patientId: string,
+  paused: boolean,
+  reason?: string,
+  resumeAt?: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { data, error } = await supabase.rpc("admin_set_patient_pause", {
+      p_patient_id: patientId,
+      p_paused: paused,
+      p_reason: reason || null,
+      p_resume_at: resumeAt || null,
+    });
+    if (error) return { success: false, error: error.message };
+    if (data && data.success === false)
+      return { success: false, error: data.error };
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+}
+
+// ----- Patient notes (teacher/admin only) -----
+export interface PatientNote {
+  id: string;
+  patient_id: string;
+  author_id: string;
+  content: string;
+  is_pinned: boolean;
+  created_at: string;
+  updated_at: string;
+  author?: { id: string; full_name?: string };
+}
+
+export async function getPatientNotes(
+  patientId: string
+): Promise<{ success: boolean; data?: PatientNote[]; error?: string }> {
+  try {
+    const { data, error } = await supabase
+      .from("patient_notes")
+      .select("*, author:profiles!patient_notes_author_id_fkey(id, full_name)")
+      .eq("patient_id", patientId)
+      .order("is_pinned", { ascending: false })
+      .order("created_at", { ascending: false });
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: (data as PatientNote[]) || [] };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+}
+
+export async function addPatientNote(
+  patientId: string,
+  content: string,
+  isPinned = false
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { data: { user: u } } = await supabase.auth.getUser();
+    if (!u) return { success: false, error: "No autenticado" };
+    const { error } = await supabase.from("patient_notes").insert({
+      patient_id: patientId,
+      author_id: u.id,
+      content,
+      is_pinned: isPinned,
+    });
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+}
+
+export async function deletePatientNote(
+  id: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { error } = await supabase.from("patient_notes").delete().eq("id", id);
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+}
+
+// ----- Attendance stats (view) -----
+export interface PatientAttendance {
+  patient_id: string;
+  full_name?: string;
+  confirmed_count: number;
+  attended_count: number;
+  absent_count: number;
+  attendance_rate_pct?: number;
+  last_attended_session?: string;
+  last_scheduled_session?: string;
+}
+
+export async function getPatientAttendance(
+  patientId: string
+): Promise<{ success: boolean; data?: PatientAttendance; error?: string }> {
+  try {
+    const { data, error } = await supabase
+      .from("patient_attendance_stats")
+      .select("*")
+      .eq("patient_id", patientId)
+      .single();
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: data as PatientAttendance };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+}
+
+export async function getAllPatientsAttendance(): Promise<{
+  success: boolean;
+  data?: PatientAttendance[];
+  error?: string;
+}> {
+  try {
+    const { data, error } = await supabase
+      .from("patient_attendance_stats")
+      .select("*");
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: (data as PatientAttendance[]) || [] };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+}
+
+// ----- Computed helpers -----
+export function computeAge(birthDate?: string): number | null {
+  if (!birthDate) return null;
+  const b = new Date(birthDate);
+  if (Number.isNaN(b.getTime())) return null;
+  const diff = Date.now() - b.getTime();
+  return Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25));
+}
+
+export function computeBMI(heightCm?: number, weightKg?: number): number | null {
+  if (!heightCm || !weightKg || heightCm <= 0) return null;
+  const m = heightCm / 100;
+  return Math.round((weightKg / (m * m)) * 10) / 10;
+}
+
+export function bmiCategory(bmi: number | null): string {
+  if (bmi === null) return "—";
+  if (bmi < 18.5) return "Bajo peso";
+  if (bmi < 25) return "Normal";
+  if (bmi < 30) return "Sobrepeso";
+  if (bmi < 35) return "Obesidad I";
+  if (bmi < 40) return "Obesidad II";
+  return "Obesidad III";
+}
+
+// ============================================
 // PLAN TEMPLATES (ADMIN)
 // ============================================
 

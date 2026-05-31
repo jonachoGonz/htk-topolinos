@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
-import { CalendarClock, BookOpen, Clock } from "lucide-react";
-import { getStudentPlan, getStudentBookings, type Plan, type BookingRecord } from "@/services/supabase";
+import { CalendarClock, BookOpen, Clock, Activity } from "lucide-react";
+import {
+  getStudentPlan, getStudentBookings, getPatientAttendance,
+  type Plan, type BookingRecord, type PatientAttendance,
+} from "@/services/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface StatCardProps {
@@ -59,6 +62,7 @@ export default function StudentDashboardSection() {
   const { user } = useAuth();
   const [plan, setPlan] = useState<Plan | null>(null);
   const [bookings, setBookings] = useState<BookingRecord[]>([]);
+  const [attendance, setAttendance] = useState<PatientAttendance | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -70,17 +74,14 @@ export default function StudentDashboardSection() {
     if (!user?.id) return;
     setIsLoading(true);
 
-    // Fetch plan
-    const planResult = await getStudentPlan(user.id);
-    if (planResult.success && planResult.data) {
-      setPlan(planResult.data);
-    }
-
-    // Fetch upcoming bookings
-    const bookingsResult = await getStudentBookings(user.id, "confirmed");
-    if (bookingsResult.success) {
-      setBookings(bookingsResult.data || []);
-    }
+    const [planResult, bookingsResult, attRes] = await Promise.all([
+      getStudentPlan(user.id),
+      getStudentBookings(user.id, "confirmed"),
+      getPatientAttendance(user.id),
+    ]);
+    if (planResult.success && planResult.data) setPlan(planResult.data);
+    if (bookingsResult.success) setBookings(bookingsResult.data || []);
+    if (attRes.success) setAttendance(attRes.data || null);
 
     setIsLoading(false);
   };
@@ -180,10 +181,10 @@ export default function StudentDashboardSection() {
       )}
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
         <StatCard
           label="Sesiones Próximas"
-          value={String(bookings.length)}
+          value={String(bookings.filter((b) => new Date(b.booking_date) >= new Date()).length)}
           unit="confirmadas"
           icon={<BookOpen className="w-10 h-10" />}
           color="blue"
@@ -196,11 +197,17 @@ export default function StudentDashboardSection() {
           color={daysUntilExpiry <= 7 ? "red" : "green"}
         />
         <StatCard
-          label="Plan Activo"
-          value={plan ? "Sí" : "No"}
-          unit={plan ? plan.name : ""}
-          icon={<CalendarClock className="w-10 h-10" />}
+          label="Asistencias"
+          value={String(attendance?.attended_count ?? 0)}
+          unit={`/ ${attendance?.confirmed_count ?? 0}`}
+          icon={<Activity className="w-10 h-10" />}
           color="green"
+        />
+        <StatCard
+          label="Tasa Asistencia"
+          value={attendance?.attendance_rate_pct != null ? `${attendance.attendance_rate_pct}%` : "—"}
+          icon={<CalendarClock className="w-10 h-10" />}
+          color={(attendance?.attendance_rate_pct ?? 100) >= 80 ? "green" : "red"}
         />
       </div>
 

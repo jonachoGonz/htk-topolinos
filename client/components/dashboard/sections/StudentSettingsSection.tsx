@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { logout } from "@/services/supabase";
-import ProfileForm from "../ProfileForm";
+import PatientForm from "../PatientForm";
 
 export default function StudentSettingsSection() {
   const navigate = useNavigate();
@@ -33,8 +33,14 @@ export default function StudentSettingsSection() {
       </div>
 
       <div className="space-y-6">
-        {/* Profile Section */}
-        <ProfileForm />
+        {/* Profile Section — same long form admin sees, but self-edit */}
+        {user?.id && (
+          <PatientForm
+            patientId={user.id}
+            onSaved={() => toast.success("Perfil guardado")}
+            onCancel={() => {}}
+          />
+        )}
 
         {/* Danger Zone */}
         <div className="max-w-2xl">
