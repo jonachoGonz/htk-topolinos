@@ -1113,6 +1113,18 @@ export interface PatientProfile {
   body_fat_pct?: number;
   muscle_mass_pct?: number;
   bone_mass_pct?: number;
+  // Body measurements (circumferences)
+  waist_cm?: number;
+  hip_cm?: number;
+  chest_cm?: number;
+  arm_cm?: number;
+  thigh_cm?: number;
+  calf_cm?: number;
+  // PAR-Q
+  parq_completed_at?: string;
+  parq_answers?: Record<string, boolean>;
+  parq_cleared?: boolean;
+  parq_clearance_notes?: string;
   activity_level?: ActivityLevel | string;
   objective?: string;
   handedness?: Handedness | string;
@@ -1147,6 +1159,8 @@ const PATIENT_FIELDS = `
   id, full_name, email, rut_dni, birth_date, gender, marital_status,
   has_children, num_children, phone, address, profession, occupation, photo_url,
   height_cm, weight_kg, body_fat_pct, muscle_mass_pct, bone_mass_pct,
+  waist_cm, hip_cm, chest_cm, arm_cm, thigh_cm, calf_cm,
+  parq_completed_at, parq_answers, parq_cleared, parq_clearance_notes,
   activity_level, objective, handedness,
   blood_type, allergies, diseases, surgeries, ailments, injuries,
   sports, drugs, medications,

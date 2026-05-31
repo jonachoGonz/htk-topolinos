@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import { X, StickyNote, Pause, Play, Trash2, Pin, Plus, Loader2, ClipboardList } from "lucide-react";
+import { X, StickyNote, Pause, Play, Trash2, Pin, Plus, Loader2, ClipboardList, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import {
-  getPatientNotes, addPatientNote, deletePatientNote,
+  getPatient, getPatientNotes, addPatientNote, deletePatientNote,
   setPatientPause, getPatientAttendance,
-  type PatientNote, type PatientAttendance,
+  type PatientNote, type PatientAttendance, type PatientProfile,
 } from "@/services/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import PatientForm from "./PatientForm";
@@ -20,11 +20,36 @@ interface PatientDetailModalProps {
 
 type Tab = "form" | "notes" | "attendance" | "pause";
 
+const CRITICAL_KEYS = new Set([
+  "diabetes_t1", "epilepsia", "cardio", "marcapasos", "embarazo", "cancer",
+]);
+const CRITICAL_LABELS: Record<string, string> = {
+  diabetes_t1: "Diabetes T1",
+  epilepsia: "Epilepsia",
+  cardio: "Cardiopatía",
+  marcapasos: "Marcapasos",
+  embarazo: "Embarazo",
+  cancer: "Cáncer",
+};
+
 export default function PatientDetailModal({
   patientId, patientName, isPaused, pauseReason, onClose, onChanged,
 }: PatientDetailModalProps) {
   const [tab, setTab] = useState<Tab>("form");
+  const [patient, setPatient] = useState<PatientProfile | null>(null);
   const { isAdmin } = useAuth();
+
+  useEffect(() => {
+    getPatient(patientId).then((r) => {
+      if (r.success) setPatient(r.data || null);
+    });
+  }, [patientId]);
+
+  const criticalConditions = (patient?.diseases || []).filter((d) =>
+    CRITICAL_KEYS.has(d)
+  );
+  const parqNotCleared = patient?.parq_cleared === false;
+  const hasAllergies = !!patient?.allergies?.trim();
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-2 sm:p-4 z-50" onClick={onClose}>
@@ -44,6 +69,24 @@ export default function PatientDetailModal({
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Critical alerts banner */}
+        {(criticalConditions.length > 0 || parqNotCleared || hasAllergies) && (
+          <div className="bg-red-500/10 border-b border-red-500/30 px-4 py-2 flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+            <div className="text-xs text-red-200 space-y-0.5 min-w-0 flex-1">
+              <p className="font-semibold">⚠ Alertas críticas a considerar</p>
+              {parqNotCleared && <p>• PAR-Q indica no apto sin autorización médica</p>}
+              {criticalConditions.length > 0 && (
+                <p>
+                  • Condiciones:{" "}
+                  {criticalConditions.map((d) => CRITICAL_LABELS[d] || d).join(", ")}
+                </p>
+              )}
+              {hasAllergies && <p>• Alergias: {patient?.allergies}</p>}
+            </div>
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="flex gap-1 border-b border-white/10 px-2 overflow-x-auto">

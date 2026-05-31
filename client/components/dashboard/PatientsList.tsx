@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
-import { Eye, Search, Pause, Loader2, Trash2, AlertCircle } from "lucide-react";
+import { Eye, Search, Pause, Loader2, Trash2, AlertCircle, MessageCircle, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -16,6 +16,32 @@ interface PatientsListProps {
   professionalId?: string;
   onAddNote?: (patientId: string) => void;
   onViewProgress?: (patientId: string) => void;
+}
+
+// Critical conditions that warrant a visible alert badge on the list card.
+// (Open the patient form to manage these in 'Enfermedades / condiciones')
+const CRITICAL_DISEASE_KEYS = new Set([
+  "diabetes_t1", "epilepsia", "cardio", "marcapasos", "embarazo", "cancer",
+]);
+const CRITICAL_DISEASE_LABELS: Record<string, string> = {
+  diabetes_t1: "Diabetes T1",
+  epilepsia: "Epilepsia",
+  cardio: "Cardiopatía",
+  marcapasos: "Marcapasos",
+  embarazo: "Embarazo",
+  cancer: "Cáncer",
+};
+
+function whatsappLink(phone: string): string {
+  // Normalize: keep only digits. If starts with 9 and 8 more digits, assume Chile +56.
+  const digits = phone.replace(/\D/g, "");
+  if (!digits) return "";
+  // Chilean mobile pattern: 56 9 XXXXXXXX or 9XXXXXXXX
+  const withCountry =
+    digits.length === 9 && digits.startsWith("9") ? `56${digits}` :
+    digits.length === 8 ? `569${digits}` :
+    digits;
+  return `https://wa.me/${withCountry}`;
 }
 
 export default function PatientsList(_props: PatientsListProps) {
@@ -105,13 +131,18 @@ export default function PatientsList(_props: PatientsListProps) {
           {filtered.map((p) => {
             const att = attendance[p.id];
             const age = computeAge(p.birth_date);
+            const criticalConditions = (p.diseases || []).filter((d) =>
+              CRITICAL_DISEASE_KEYS.has(d)
+            );
+            const parqNotCleared = p.parq_cleared === false;
+            const waLink = p.phone ? whatsappLink(p.phone) : "";
             return (
               <div key={p.id}
                 className={`bg-[#0f131a] border rounded-xl p-4 space-y-3 transition ${
                   p.is_paused ? "border-amber-500/30 opacity-75" : "border-white/[0.06] hover:border-white/10"
                 }`}>
                 <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-3 min-w-0">
+                  <div className="flex items-start gap-3 min-w-0 flex-1">
                     {p.photo_url ? (
                       <img src={p.photo_url} alt="" className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
                     ) : (
@@ -121,10 +152,10 @@ export default function PatientsList(_props: PatientsListProps) {
                         </span>
                       </div>
                     )}
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="text-white font-semibold font-lexend text-sm truncate">{p.full_name || "Sin nombre"}</p>
                       <div className="flex items-center gap-2 flex-wrap mt-0.5">
-                        {p.email && <span className="text-gray-500 text-xs truncate">{p.email}</span>}
+                        {p.email && <span className="text-gray-500 text-xs truncate max-w-[160px]">{p.email}</span>}
                         {age != null && <span className="text-gray-400 text-xs">{age} años</span>}
                         {p.is_paused && (
                           <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
@@ -132,8 +163,38 @@ export default function PatientsList(_props: PatientsListProps) {
                           </span>
                         )}
                       </div>
+                      {/* Critical alerts row */}
+                      {(criticalConditions.length > 0 || parqNotCleared) && (
+                        <div className="flex items-center gap-1 flex-wrap mt-1.5">
+                          {parqNotCleared && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-500/15 text-red-300 border border-red-500/30">
+                              <AlertTriangle className="w-3 h-3" /> PAR-Q no apto
+                            </span>
+                          )}
+                          {criticalConditions.map((d) => (
+                            <span
+                              key={d}
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-500/10 text-red-300 border border-red-500/20"
+                            >
+                              {CRITICAL_DISEASE_LABELS[d] || d}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
+                  {/* Quick WhatsApp contact */}
+                  {waLink && (
+                    <a
+                      href={waLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Contactar por WhatsApp"
+                      className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition flex-shrink-0"
+                    >
+                      <MessageCircle className="w-4 h-4" />
+                    </a>
+                  )}
                 </div>
 
                 {/* Mini stats */}

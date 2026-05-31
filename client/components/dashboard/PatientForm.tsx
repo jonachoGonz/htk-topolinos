@@ -1,10 +1,9 @@
 import { useState, useEffect } from "react";
-import { ChevronDown, ChevronUp, Save, Loader2, Plus, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Save, Loader2, Plus, X, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   getPatient,
   updatePatient,
-  createPatientProfile,
   computeAge,
   computeBMI,
   bmiCategory,
@@ -13,6 +12,19 @@ import {
   type SubstanceEntry,
   type MedicationEntry,
 } from "@/services/supabase";
+import { isValidRut, formatRut, cleanRut } from "@/lib/rut";
+import PhotoUploader from "./PhotoUploader";
+
+// PAR-Q: Physical Activity Readiness Questionnaire (7 standard questions)
+const PARQ_QUESTIONS = [
+  { key: "q1", text: "¿Te ha dicho alguna vez tu médico que tienes una condición cardíaca y que solo debes realizar actividad física recomendada por un médico?" },
+  { key: "q2", text: "¿Sientes dolor en el pecho cuando realizas actividad física?" },
+  { key: "q3", text: "En el último mes, ¿has tenido dolor en el pecho cuando NO estabas realizando actividad física?" },
+  { key: "q4", text: "¿Pierdes el equilibrio debido a mareos o alguna vez has perdido el conocimiento?" },
+  { key: "q5", text: "¿Tienes algún problema óseo o articular que podría empeorar con un cambio en tu actividad física?" },
+  { key: "q6", text: "¿Tu médico te está prescribiendo actualmente algún medicamento para la presión arterial o para una condición cardíaca?" },
+  { key: "q7", text: "¿Conoces alguna otra razón por la cual no deberías hacer actividad física?" },
+];
 
 // List of common conditions (checkboxes)
 const COMMON_DISEASES = [
@@ -85,7 +97,8 @@ const EMPTY: Partial<PatientProfile> = {
 };
 
 type SectionId =
-  | "personal" | "professional" | "body" | "goals" | "medical"
+  | "photo" | "personal" | "professional" | "body" | "measurements"
+  | "goals" | "parq" | "medical"
   | "conditions" | "sports" | "substances" | "emergency" | "extra" | "admin";
 
 export default function PatientForm({ patientId, onSaved, onCancel }: PatientFormProps) {
@@ -93,10 +106,12 @@ export default function PatientForm({ patientId, onSaved, onCancel }: PatientFor
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [open, setOpen] = useState<Record<SectionId, boolean>>({
-    personal: true, professional: false, body: false, goals: false,
-    medical: false, conditions: false, sports: false, substances: false,
+    photo: true, personal: true, professional: false, body: false,
+    measurements: false, goals: false, parq: false, medical: false,
+    conditions: false, sports: false, substances: false,
     emergency: false, extra: false, admin: false,
   });
+  const [rutTouched, setRutTouched] = useState(false);
 
   useEffect(() => {
     if (patientId) {
@@ -115,6 +130,23 @@ export default function PatientForm({ patientId, onSaved, onCancel }: PatientFor
 
   const age = computeAge(form.birth_date as string | undefined);
   const bmi = computeBMI(form.height_cm as number, form.weight_kg as number);
+
+  const rutValid = !form.rut_dni || isValidRut(form.rut_dni);
+
+  // PAR-Q helpers
+  const parqAnswers = (form.parq_answers || {}) as Record<string, boolean>;
+  const allParqAnswered = PARQ_QUESTIONS.every((q) => q.key in parqAnswers);
+  const parqHasAnyYes = Object.values(parqAnswers).some((v) => v === true);
+  const parqClearedComputed = allParqAnswered && !parqHasAnyYes;
+  const setParq = (k: string, v: boolean) => {
+    const next = { ...parqAnswers, [k]: v };
+    set("parq_answers", next as any);
+    // Auto-update cleared flag if all 7 answered
+    if (PARQ_QUESTIONS.every((q) => q.key in next)) {
+      set("parq_cleared", !Object.values(next).some((x) => x === true) as any);
+      set("parq_completed_at", new Date().toISOString() as any);
+    }
+  };
 
   const toggleDisease = (k: string) =>
     set("diseases", (form.diseases || []).includes(k)
@@ -139,6 +171,15 @@ export default function PatientForm({ patientId, onSaved, onCancel }: PatientFor
       toast.error("Nombre completo es requerido");
       setOpen((o) => ({ ...o, personal: true }));
       return;
+    }
+    if (form.rut_dni && !isValidRut(form.rut_dni)) {
+      toast.error("RUT inválido (revisa formato y dígito verificador)");
+      setOpen((o) => ({ ...o, personal: true }));
+      return;
+    }
+    // Normalize RUT to "12.345.678-9" before saving
+    if (form.rut_dni && isValidRut(form.rut_dni)) {
+      form.rut_dni = formatRut(form.rut_dni);
     }
     setSaving(true);
     if (patientId) {
@@ -166,10 +207,37 @@ export default function PatientForm({ patientId, onSaved, onCancel }: PatientFor
 
   return (
     <div className="space-y-3">
+      {patientId && (
+        <Section id="photo" title="Foto del paciente" open={open.photo} onToggle={toggle}>
+          <PhotoUploader
+            patientId={patientId}
+            currentUrl={form.photo_url}
+            onChange={(url) => set("photo_url", url as any)}
+          />
+        </Section>
+      )}
+
       <Section id="personal" title="Datos personales" open={open.personal} onToggle={toggle}>
         <Grid>
           <Field label="Nombre completo *"><Input value={form.full_name || ""} onChange={(v) => set("full_name", v)} /></Field>
-          <Field label="RUT / DNI"><Input value={form.rut_dni || ""} onChange={(v) => set("rut_dni", v)} /></Field>
+          <Field label="RUT / DNI">
+            <Input
+              value={form.rut_dni || ""}
+              onChange={(v) => { set("rut_dni", v); setRutTouched(true); }}
+              onBlur={() => {
+                if (form.rut_dni && isValidRut(form.rut_dni)) {
+                  set("rut_dni", formatRut(form.rut_dni));
+                }
+              }}
+              placeholder="12.345.678-9"
+            />
+            {rutTouched && form.rut_dni && !rutValid && (
+              <p className="text-[10px] text-red-400 mt-1">RUT inválido (verifica formato y dígito)</p>
+            )}
+            {rutTouched && form.rut_dni && rutValid && (
+              <p className="text-[10px] text-emerald-400 mt-1">RUT válido ✓</p>
+            )}
+          </Field>
           <Field label="Email"><Input type="email" value={form.email || ""} onChange={(v) => set("email", v)} /></Field>
           <Field label="Teléfono"><Input value={form.phone || ""} onChange={(v) => set("phone", v)} /></Field>
           <Field label={`Fecha de nacimiento ${age != null ? `(${age} años)` : ""}`}>
@@ -220,6 +288,25 @@ export default function PatientForm({ patientId, onSaved, onCancel }: PatientFor
         </Grid>
       </Section>
 
+      <Section id="measurements" title="Mediciones (circunferencias en cm)" open={open.measurements} onToggle={toggle}>
+        <Grid>
+          <Field label="Cintura"><Input type="number" value={String(form.waist_cm ?? "")} onChange={(v) => set("waist_cm", parseFloat(v) || (undefined as any))} /></Field>
+          <Field label="Cadera"><Input type="number" value={String(form.hip_cm ?? "")} onChange={(v) => set("hip_cm", parseFloat(v) || (undefined as any))} /></Field>
+          <Field label="Pecho"><Input type="number" value={String(form.chest_cm ?? "")} onChange={(v) => set("chest_cm", parseFloat(v) || (undefined as any))} /></Field>
+          <Field label="Brazo"><Input type="number" value={String(form.arm_cm ?? "")} onChange={(v) => set("arm_cm", parseFloat(v) || (undefined as any))} /></Field>
+          <Field label="Muslo"><Input type="number" value={String(form.thigh_cm ?? "")} onChange={(v) => set("thigh_cm", parseFloat(v) || (undefined as any))} /></Field>
+          <Field label="Pantorrilla"><Input type="number" value={String(form.calf_cm ?? "")} onChange={(v) => set("calf_cm", parseFloat(v) || (undefined as any))} /></Field>
+        </Grid>
+        {form.waist_cm && form.hip_cm && (
+          <p className="mt-2 text-xs text-gray-400">
+            Índice cintura/cadera:{" "}
+            <span className="text-white font-semibold">
+              {(form.waist_cm / form.hip_cm).toFixed(2)}
+            </span>
+          </p>
+        )}
+      </Section>
+
       <Section id="goals" title="Actividad y objetivos" open={open.goals} onToggle={toggle}>
         <Grid>
           <Field label="Nivel de actividad física">
@@ -237,6 +324,99 @@ export default function PatientForm({ patientId, onSaved, onCancel }: PatientFor
             <Textarea value={form.objective || ""} onChange={(v) => set("objective", v)} rows={2} placeholder="Ej: rehabilitación post-cirugía, ganar fuerza, perder grasa…" />
           </Field>
         </Grid>
+      </Section>
+
+      <Section id="parq" title="PAR-Q (Cuestionario de aptitud para actividad física)" open={open.parq} onToggle={toggle}>
+        <p className="text-xs text-gray-400 mb-3">
+          Cuestionario estándar internacional. Responde con honestidad — si marcas <strong>SÍ</strong> en
+          alguna pregunta, recomendamos consultar con un médico antes de iniciar entrenamiento.
+        </p>
+        <div className="space-y-2">
+          {PARQ_QUESTIONS.map((q, idx) => {
+            const ans = parqAnswers[q.key];
+            return (
+              <div
+                key={q.key}
+                className={`p-3 rounded-lg border ${
+                  ans === true
+                    ? "bg-red-500/10 border-red-500/20"
+                    : ans === false
+                    ? "bg-emerald-500/5 border-emerald-500/15"
+                    : "bg-[#0f131a] border-white/10"
+                }`}
+              >
+                <p className="text-xs text-white mb-2">
+                  <span className="text-gray-500 mr-1">{idx + 1}.</span>
+                  {q.text}
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setParq(q.key, true)}
+                    className={`flex-1 py-1.5 rounded text-xs font-semibold transition ${
+                      ans === true
+                        ? "bg-red-500 text-white"
+                        : "bg-white/[0.05] text-gray-400 hover:text-white"
+                    }`}
+                  >
+                    SÍ
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setParq(q.key, false)}
+                    className={`flex-1 py-1.5 rounded text-xs font-semibold transition ${
+                      ans === false
+                        ? "bg-emerald-500 text-white"
+                        : "bg-white/[0.05] text-gray-400 hover:text-white"
+                    }`}
+                  >
+                    NO
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {allParqAnswered && (
+          <div
+            className={`mt-4 p-3 rounded-lg flex items-start gap-2 ${
+              parqClearedComputed
+                ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-200"
+                : "bg-red-500/10 border border-red-500/20 text-red-200"
+            }`}
+          >
+            {parqClearedComputed ? (
+              <CheckCircle2 className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            ) : (
+              <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            )}
+            <div>
+              <p className="text-xs font-semibold">
+                {parqClearedComputed
+                  ? "✓ Apto para iniciar actividad física"
+                  : "⚠ Requiere autorización médica antes de entrenar"}
+              </p>
+              <p className="text-[10px] mt-0.5 opacity-80">
+                Completado: {form.parq_completed_at ? new Date(form.parq_completed_at).toLocaleString() : "ahora"}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {allParqAnswered && !parqClearedComputed && (
+          <div className="mt-3">
+            <label className="block text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-1">
+              Notas de autorización médica (si aplica)
+            </label>
+            <Textarea
+              value={form.parq_clearance_notes || ""}
+              onChange={(v: string) => set("parq_clearance_notes", v)}
+              rows={2}
+              placeholder="Ej: Médico tratante autorizó actividad de bajo impacto. Documento adjunto en archivos."
+            />
+          </div>
+        )}
       </Section>
 
       <Section id="medical" title="Datos médicos básicos" open={open.medical} onToggle={toggle}>
@@ -391,10 +571,11 @@ function Field({ label, children, full }: any) {
     </div>
   );
 }
-function Input({ value, onChange, type = "text", placeholder, className = "", disabled }: any) {
+function Input({ value, onChange, onBlur, type = "text", placeholder, className = "", disabled }: any) {
   return (
     <input type={type} value={value} disabled={disabled} placeholder={placeholder}
       onChange={(e) => onChange(e.target.value)}
+      onBlur={onBlur}
       className={`w-full bg-[#0a0e1a] border border-white/10 rounded-lg px-3 py-2 text-sm text-white font-inter focus:outline-none focus:border-[#00d4ff]/40 disabled:opacity-50 ${className}`} />
   );
 }
