@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -8,11 +8,21 @@ import StudentDashboardSection from "@/components/dashboard/sections/StudentDash
 import StudentCalendarSection from "@/components/dashboard/sections/StudentCalendarSection";
 import StudentPaymentSection from "@/components/dashboard/sections/StudentPaymentSection";
 import StudentSettingsSection from "@/components/dashboard/sections/StudentSettingsSection";
+import OnboardingWizard from "@/components/dashboard/OnboardingWizard";
+import { getOnboardingState } from "@/services/supabase";
 
 export default function StudentDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const { user } = useAuth();
+
+  useEffect(() => {
+    if (!user?.id) return;
+    getOnboardingState(user.id).then((r) => {
+      if (r.success && r.data) setNeedsOnboarding(!r.data.completed);
+    });
+  }, [user?.id]);
 
   const handleNewBooking = () => {
     toast("Ir a calendario para crear una nueva sesión");
@@ -56,6 +66,14 @@ export default function StudentDashboard() {
       >
         <Plus className="w-5 h-5" />
       </button>
+
+      {/* Onboarding wizard — blocks usage until profile + PAR-Q complete */}
+      {needsOnboarding && user?.id && (
+        <OnboardingWizard
+          userId={user.id}
+          onComplete={() => setNeedsOnboarding(false)}
+        />
+      )}
     </div>
   );
 }

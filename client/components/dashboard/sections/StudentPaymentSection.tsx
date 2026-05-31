@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { CreditCard } from "lucide-react";
+import { CreditCard, Package } from "lucide-react";
 import { getPlanHistory, type Plan } from "@/services/supabase";
+import StudentPricing from "@/components/dashboard/StudentPricing";
 
 interface StudentPaymentSectionProps {
   studentId: string;
@@ -9,6 +10,7 @@ interface StudentPaymentSectionProps {
 export default function StudentPaymentSection({ studentId }: StudentPaymentSectionProps) {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [tab, setTab] = useState<"history" | "buy">("history");
 
   useEffect(() => {
     if (!studentId) return;
@@ -52,10 +54,29 @@ export default function StudentPaymentSection({ studentId }: StudentPaymentSecti
         </div>
       </div>
 
+      {/* Tabs */}
+      <div className="flex gap-3 mb-5 border-b border-white/[0.06]">
+        <button onClick={() => setTab("history")}
+          className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold transition ${
+            tab === "history" ? "text-[#00d4ff] border-b-2 border-[#00d4ff]" : "text-gray-400 hover:text-white"
+          }`}>
+          <CreditCard className="w-4 h-4" /> Mis planes
+        </button>
+        <button onClick={() => setTab("buy")}
+          className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold transition ${
+            tab === "buy" ? "text-[#00d4ff] border-b-2 border-[#00d4ff]" : "text-gray-400 hover:text-white"
+          }`}>
+          <Package className="w-4 h-4" /> Comprar / Renovar
+        </button>
+      </div>
+
+      {tab === "buy" ? (
+        <StudentPricing />
+      ) : (
       <div className="bg-[#0f131a] border border-white/[0.06] rounded-xl overflow-hidden">
         <div className="px-6 py-4 border-b border-white/[0.06]">
           <h2 className="text-lg font-semibold text-white font-lexend">
-            Mis Planes
+            Historial de planes
           </h2>
         </div>
 
@@ -102,14 +123,6 @@ export default function StudentPaymentSection({ studentId }: StudentPaymentSecti
           </div>
         )}
       </div>
-
-      {/* Renewal Notice */}
-      {plans.some((p) => p.is_active) && (
-        <div className="mt-6 bg-blue-500/10 border border-blue-500/20 rounded-xl p-4">
-          <p className="text-sm text-blue-300 font-inter">
-            💡 <strong>Próximamente:</strong> Podrás renovar tu plan directamente desde esta sección. Por ahora, contacta con tu profesor para renovar.
-          </p>
-        </div>
       )}
     </div>
   );

@@ -1,4 +1,5 @@
-import { Bell, UserCircle, Menu } from "lucide-react";
+import { UserCircle, Menu } from "lucide-react";
+import NotificationBell from "./NotificationBell";
 
 interface StudentTopBarProps {
   onMenuToggle: () => void;
@@ -58,9 +59,7 @@ export default function StudentTopBar({
 
       {/* Right: icons */}
       <div className="flex items-center gap-1 flex-shrink-0">
-        <button className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white transition rounded-lg hover:bg-white/5">
-          <Bell className="w-[18px] h-[18px]" />
-        </button>
+        <NotificationBell />
         <button className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white transition rounded-lg hover:bg-white/5">
           <UserCircle className="w-[18px] h-[18px]" />
         </button>

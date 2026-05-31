@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
-import { Trash2, Plus, Calendar } from "lucide-react";
+import { Trash2, Plus, Calendar, X, AlertTriangle, Loader2, Send } from "lucide-react";
 import { toast } from "sonner";
 import {
   getHolidays,
   createHoliday,
   deleteHoliday,
+  getBookingsAffectedByHoliday,
+  cancelBookingsAndNotify,
   type Holiday,
+  type AffectedBooking,
 } from "@/services/supabase";
 
 interface HolidayManagerProps {
@@ -18,6 +21,12 @@ export default function HolidayManager({
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [affectedModal, setAffectedModal] = useState<{
+    holiday: Holiday | null;
+    bookings: AffectedBooking[];
+  } | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [sendingCancellations, setSendingCancellations] = useState(false);
   const [formData, setFormData] = useState({
     title: "",
     startDate: "",
@@ -61,19 +70,46 @@ export default function HolidayManager({
 
     if (result.success) {
       toast.success("Vacación creada correctamente");
+
+      // Check for affected bookings within the date range
+      const affectedRes = await getBookingsAffectedByHoliday(
+        professionalId, formData.startDate, formData.endDate
+      );
+      if (affectedRes.success && (affectedRes.data?.length ?? 0) > 0) {
+        // Open modal to allow cancel + notify
+        const fakeHoliday: Holiday = {
+          id: "", professional_id: professionalId,
+          title: formData.title,
+          start_date: formData.startDate, end_date: formData.endDate,
+          is_recurring: formData.isRecurring,
+          created_at: new Date().toISOString(),
+        };
+        setAffectedModal({ holiday: fakeHoliday, bookings: affectedRes.data || [] });
+        setCancelReason(formData.title);
+      }
+
       setFormData({
-        title: "",
-        startDate: "",
-        endDate: "",
-        isRecurring: false,
-        recurringType: "yearly",
-        notes: "",
+        title: "", startDate: "", endDate: "",
+        isRecurring: false, recurringType: "yearly", notes: "",
       });
       fetchHolidays();
     } else {
       toast.error(`Error: ${result.error}`);
     }
     setIsCreating(false);
+  };
+
+  const handleCancelAffected = async () => {
+    if (!affectedModal) return;
+    setSendingCancellations(true);
+    const r = await cancelBookingsAndNotify(affectedModal.bookings, cancelReason);
+    if (r.success) {
+      toast.success(`${r.cancelled} clases canceladas y ${r.notified} alumnos notificados`);
+      setAffectedModal(null);
+    } else {
+      toast.error(`Error: ${r.error}`);
+    }
+    setSendingCancellations(false);
   };
 
   const handleDelete = async (id: string) => {
@@ -280,6 +316,65 @@ export default function HolidayManager({
           </div>
         )}
       </div>
+
+      {/* Affected bookings modal */}
+      {affectedModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+          <div className="bg-[#0a0e1a] border border-white/10 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="bg-amber-500/10 border-b border-amber-500/30 px-4 py-3 flex items-start justify-between gap-3">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="text-white font-bold font-lexend">Hay clases agendadas en este período</h3>
+                  <p className="text-amber-200 text-xs mt-1">
+                    {affectedModal.bookings.length} reserva(s) se verá(n) afectada(s). Cancela y notifica a los alumnos para que reagenden.
+                  </p>
+                </div>
+              </div>
+              <button onClick={() => setAffectedModal(null)} disabled={sendingCancellations}
+                className="text-gray-400 hover:text-white"><X className="w-5 h-5" /></button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+              {affectedModal.bookings.map((b) => (
+                <div key={b.booking_id} className="flex items-center gap-3 p-3 rounded-lg bg-[#0f131a] border border-white/[0.06]">
+                  <div className="text-center w-12 flex-shrink-0">
+                    <p className="text-[10px] uppercase text-gray-500">
+                      {new Date(b.booking_date).toLocaleDateString("es", { weekday: "short" })}
+                    </p>
+                    <p className="text-sm font-bold text-white">{new Date(b.booking_date).getDate()}</p>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white text-sm font-semibold">{b.student_name || "Alumno"}</p>
+                    <p className="text-gray-500 text-xs">{b.start_time.slice(0,5)} – {b.end_time.slice(0,5)}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="border-t border-white/10 p-4 space-y-3">
+              <div>
+                <label className="block text-[10px] uppercase text-gray-500 font-semibold mb-1">
+                  Motivo (se envía al alumno)
+                </label>
+                <input value={cancelReason} onChange={(e) => setCancelReason(e.target.value)}
+                  className="w-full bg-[#0f131a] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#00d4ff]/40" />
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button onClick={() => setAffectedModal(null)} disabled={sendingCancellations}
+                  className="px-4 py-2 rounded-lg bg-white/[0.05] border border-white/10 text-white text-sm font-semibold hover:bg-white/[0.08] transition disabled:opacity-40">
+                  No cancelar
+                </button>
+                <button onClick={handleCancelAffected} disabled={sendingCancellations}
+                  className="px-4 py-2 rounded-lg bg-red-500 hover:bg-red-400 text-white text-sm font-bold transition flex items-center gap-2 disabled:opacity-40">
+                  {sendingCancellations ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  Cancelar {affectedModal.bookings.length} y notificar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

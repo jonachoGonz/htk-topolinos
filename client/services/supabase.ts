@@ -1065,6 +1065,202 @@ export function canCancelBooking(
 }
 
 // ============================================
+// NOTIFICATIONS (B)
+// ============================================
+export type NotificationType =
+  | "booking_reminder" | "plan_expiry" | "plan_purchased" | "plan_assigned"
+  | "booking_cancelled" | "class_reagendar" | "patient_paused"
+  | "new_signup" | "booking_attended" | "admin_message" | "new_booking";
+
+export interface AppNotification {
+  id: string;
+  user_id: string;
+  type: NotificationType | string;
+  title: string;
+  body?: string;
+  link?: string;
+  metadata?: any;
+  read_at?: string;
+  created_at: string;
+  email_sent_at?: string;
+}
+
+export async function getNotifications(limit = 30): Promise<{
+  success: boolean; data?: AppNotification[]; error?: string;
+}> {
+  try {
+    const { data, error } = await supabase
+      .from("notifications").select("*")
+      .order("created_at", { ascending: false })
+      .limit(limit);
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: (data as AppNotification[]) || [] };
+  } catch (e) { return { success: false, error: String(e) }; }
+}
+
+export async function getUnreadCount(): Promise<{ success: boolean; count: number }> {
+  try {
+    const { data: u } = await supabase.auth.getUser();
+    if (!u?.user?.id) return { success: true, count: 0 };
+    const { count, error } = await supabase
+      .from("notifications").select("id", { count: "exact", head: true })
+      .is("read_at", null)
+      .eq("user_id", u.user.id);
+    if (error) return { success: false, count: 0 };
+    return { success: true, count: count || 0 };
+  } catch { return { success: false, count: 0 }; }
+}
+
+export async function markNotificationRead(id: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { error } = await supabase
+      .from("notifications").update({ read_at: new Date().toISOString() })
+      .eq("id", id);
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (e) { return { success: false, error: String(e) }; }
+}
+
+export async function markAllNotificationsRead(): Promise<{ success: boolean }> {
+  try {
+    const { data: u } = await supabase.auth.getUser();
+    if (!u?.user?.id) return { success: false };
+    await supabase.from("notifications")
+      .update({ read_at: new Date().toISOString() })
+      .is("read_at", null)
+      .eq("user_id", u.user.id);
+    return { success: true };
+  } catch { return { success: false }; }
+}
+
+export async function createNotificationForUser(
+  userId: string, type: string, title: string, body?: string, link?: string, metadata?: any
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { error } = await supabase.rpc("create_notification", {
+      p_user_id: userId, p_type: type, p_title: title,
+      p_body: body || null, p_link: link || null, p_metadata: metadata || {},
+    });
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (e) { return { success: false, error: String(e) }; }
+}
+
+/** Subscribe to realtime new notifications for the current user. */
+export function subscribeToNotifications(
+  userId: string,
+  onNew: (n: AppNotification) => void
+): () => void {
+  const channel = supabase.channel(`notifications:${userId}`)
+    .on("postgres_changes",
+      { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${userId}` },
+      (payload) => onNew(payload.new as AppNotification)
+    )
+    .subscribe();
+  return () => { supabase.removeChannel(channel); };
+}
+
+// ============================================
+// REAGENDAR (H)
+// ============================================
+export interface AffectedBooking {
+  booking_id: string;
+  student_id: string;
+  student_name?: string;
+  booking_date: string;
+  start_time: string;
+  end_time: string;
+}
+export async function getBookingsAffectedByHoliday(
+  professionalId: string, startDate: string, endDate: string
+): Promise<{ success: boolean; data?: AffectedBooking[]; error?: string }> {
+  try {
+    const { data, error } = await supabase.rpc("bookings_affected_by_holiday", {
+      p_professional_id: professionalId,
+      p_start_date: startDate,
+      p_end_date: endDate,
+    });
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: (data as AffectedBooking[]) || [] };
+  } catch (e) { return { success: false, error: String(e) }; }
+}
+
+export async function cancelBookingsAndNotify(
+  bookings: AffectedBooking[], reason: string
+): Promise<{ success: boolean; cancelled: number; notified: number; error?: string }> {
+  let cancelled = 0;
+  let notified = 0;
+  try {
+    for (const b of bookings) {
+      const { error } = await supabase.from("bookings")
+        .update({ status: "cancelled", cancelled_at: new Date().toISOString(), notes: reason })
+        .eq("id", b.booking_id);
+      if (!error) {
+        cancelled++;
+        await createNotificationForUser(
+          b.student_id,
+          "class_reagendar",
+          "Tu clase fue cancelada por el profesional",
+          `Tu clase del ${b.booking_date} a las ${b.start_time.slice(0,5)} fue cancelada. Motivo: ${reason}. Te invitamos a reagendar.`,
+          "/dashboard/student",
+          { original_booking: b.booking_id }
+        );
+        notified++;
+      }
+    }
+    return { success: true, cancelled, notified };
+  } catch (e) { return { success: false, cancelled, notified, error: String(e) }; }
+}
+
+// ============================================
+// ONBOARDING (F)
+// ============================================
+export interface OnboardingState {
+  completed: boolean;
+  steps: Record<string, boolean>;
+  missingFields: string[];
+}
+
+export async function getOnboardingState(
+  userId: string
+): Promise<{ success: boolean; data?: OnboardingState; error?: string }> {
+  try {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("onboarding_completed_at, onboarding_steps, full_name, birth_date, rut_dni, phone, parq_completed_at, parq_cleared, informed_consent_signed")
+      .eq("id", userId).single();
+    if (error) return { success: false, error: error.message };
+
+    const steps: Record<string, boolean> = data.onboarding_steps || {};
+    const missingFields: string[] = [];
+    if (!data.full_name) missingFields.push("full_name");
+    if (!data.birth_date) missingFields.push("birth_date");
+    if (!data.phone) missingFields.push("phone");
+    if (!data.parq_completed_at) missingFields.push("parq");
+    if (!data.informed_consent_signed) missingFields.push("informed_consent_signed");
+
+    return {
+      success: true,
+      data: {
+        completed: !!data.onboarding_completed_at,
+        steps,
+        missingFields,
+      },
+    };
+  } catch (e) { return { success: false, error: String(e) }; }
+}
+
+export async function markOnboardingCompleted(userId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { error } = await supabase.from("profiles")
+      .update({ onboarding_completed_at: new Date().toISOString() })
+      .eq("id", userId);
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (e) { return { success: false, error: String(e) }; }
+}
+
+// ============================================
 // APP SETTINGS (singleton)
 // ============================================
 
@@ -1413,6 +1609,42 @@ export async function createPatientProfile(
     return { success: true };
   } catch (error) {
     return { success: false, error: String(error) };
+  }
+}
+
+/**
+ * Admin: create a brand-new patient (auth.user + profile).
+ * Calls a Netlify Function that uses the service role key on the server.
+ * Falls back to a clear error message if env is not configured.
+ */
+export async function adminCreatePatient(payload: {
+  full_name: string;
+  email: string;
+  phone?: string;
+  rut_dni?: string;
+  send_invite?: boolean;
+}): Promise<{ success: boolean; user_id?: string; error?: string }> {
+  try {
+    const { data: sess } = await supabase.auth.getSession();
+    const token = sess?.session?.access_token;
+    if (!token) return { success: false, error: "No estás autenticado" };
+
+    const res = await fetch("/.netlify/functions/admin-create-patient", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const msg = json.error || `HTTP ${res.status}`;
+      return { success: false, error: msg };
+    }
+    return { success: true, user_id: json.user_id };
+  } catch (e) {
+    return { success: false, error: String(e) };
   }
 }
 
