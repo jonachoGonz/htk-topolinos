@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
-import { Eye, Search, Pause, Loader2, Trash2, AlertCircle, MessageCircle, AlertTriangle } from "lucide-react";
+import { Eye, Search, Pause, Loader2, Trash2, MessageCircle, AlertTriangle, UserPlus, X, Mail, Loader } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -7,6 +7,7 @@ import {
   getAllPatientsAttendance,
   deletePatient,
   computeAge,
+  adminCreatePatient,
   type PatientProfile,
   type PatientAttendance,
 } from "@/services/supabase";
@@ -51,6 +52,11 @@ export default function PatientsList(_props: PatientsListProps) {
   const [search, setSearch] = useState("");
   const [showPaused, setShowPaused] = useState(true);
   const [selected, setSelected] = useState<PatientProfile | null>(null);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    full_name: "", email: "", phone: "", rut_dni: "", send_invite: true,
+  });
+  const [creating, setCreating] = useState(false);
   const { isAdmin } = useAuth();
 
   const fetchAll = async () => {
@@ -81,6 +87,28 @@ export default function PatientsList(_props: PatientsListProps) {
     });
   }, [patients, search, showPaused]);
 
+  const handleCreate = async () => {
+    if (!createForm.full_name.trim() || !createForm.email.trim()) {
+      toast.error("Nombre y email son requeridos");
+      return;
+    }
+    setCreating(true);
+    const r = await adminCreatePatient(createForm);
+    if (r.success) {
+      toast.success(
+        createForm.send_invite
+          ? `Paciente creado. Email de invitación enviado a ${createForm.email}`
+          : `Paciente creado. Email: ${createForm.email}`
+      );
+      setCreateModalOpen(false);
+      setCreateForm({ full_name: "", email: "", phone: "", rut_dni: "", send_invite: true });
+      fetchAll();
+    } else {
+      toast.error(`Error: ${r.error}`);
+    }
+    setCreating(false);
+  };
+
   const handleDelete = async (p: PatientProfile) => {
     if (!confirm(`¿Eliminar a "${p.full_name}"? Esta acción pausa al alumno y desactiva su plan.`)) return;
     const r = await deletePatient(p.id);
@@ -106,14 +134,15 @@ export default function PatientsList(_props: PatientsListProps) {
         </label>
       </div>
 
-      {/* Info banner for admin: signup workflow */}
+      {/* Admin: create patient button */}
       {isAdmin && (
-        <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-200 text-xs flex items-start gap-2">
-          <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-          <p>
-            Para crear un nuevo paciente, debe registrarse primero en{" "}
-            <code className="bg-black/30 px-1 rounded">/login</code> (signup). Luego completas su perfil aquí.
-          </p>
+        <div className="flex justify-end">
+          <button
+            onClick={() => setCreateModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#00d4ff] hover:bg-cyan-300 text-[#05050A] text-sm font-bold transition"
+          >
+            <UserPlus className="w-4 h-4" /> Crear paciente
+          </button>
         </div>
       )}
 
@@ -248,6 +277,86 @@ export default function PatientsList(_props: PatientsListProps) {
           onChanged={fetchAll}
         />
       )}
+
+      {/* Create patient modal */}
+      {createModalOpen && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50"
+          onClick={() => !creating && setCreateModalOpen(false)}>
+          <div className="bg-[#0a0e1a] border border-white/10 rounded-xl max-w-md w-full overflow-hidden"
+            onClick={(e) => e.stopPropagation()}>
+            <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-white font-montserrat flex items-center gap-2">
+                <UserPlus className="w-5 h-5 text-[#00d4ff]" /> Crear paciente
+              </h3>
+              <button onClick={() => !creating && setCreateModalOpen(false)}
+                className="text-gray-400 hover:text-white"><X className="w-4 h-4" /></button>
+            </div>
+
+            <div className="p-5 space-y-3">
+              <Field label="Nombre completo *">
+                <Input value={createForm.full_name}
+                  onChange={(v) => setCreateForm({ ...createForm, full_name: v })} />
+              </Field>
+              <Field label="Email *">
+                <Input type="email" value={createForm.email}
+                  onChange={(v) => setCreateForm({ ...createForm, email: v })} />
+              </Field>
+              <Field label="Teléfono">
+                <Input value={createForm.phone}
+                  onChange={(v) => setCreateForm({ ...createForm, phone: v })} />
+              </Field>
+              <Field label="RUT">
+                <Input value={createForm.rut_dni}
+                  onChange={(v) => setCreateForm({ ...createForm, rut_dni: v })} />
+              </Field>
+
+              <label className="flex items-start gap-2 pt-2 cursor-pointer">
+                <input type="checkbox" checked={createForm.send_invite}
+                  onChange={(e) => setCreateForm({ ...createForm, send_invite: e.target.checked })}
+                  className="mt-0.5" />
+                <span className="text-xs text-gray-300">
+                  <strong>Enviar email de invitación</strong>
+                  <span className="block text-gray-500 mt-0.5">
+                    El paciente recibirá un link para crear su contraseña. Si lo desmarcas, se creará con contraseña temporal aleatoria.
+                  </span>
+                </span>
+              </label>
+
+              <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-2 text-[10px] text-blue-200">
+                <Mail className="inline w-3 h-3 mr-1" />
+                Requiere variables SUPABASE_SERVICE_ROLE_KEY + SUPABASE_URL en Netlify para funcionar en producción.
+              </div>
+            </div>
+
+            <div className="px-5 py-3 border-t border-white/10 flex justify-end gap-2">
+              <button onClick={() => setCreateModalOpen(false)} disabled={creating}
+                className="px-4 py-2 rounded-lg bg-white/[0.05] border border-white/10 text-white text-sm font-semibold hover:bg-white/[0.08] transition disabled:opacity-40">
+                Cancelar
+              </button>
+              <button onClick={handleCreate} disabled={creating}
+                className="px-4 py-2 rounded-lg bg-[#00d4ff] hover:bg-cyan-300 text-[#05050A] text-sm font-bold transition flex items-center gap-2 disabled:opacity-40">
+                {creating ? <Loader className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+                Crear paciente
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+function Field({ label, children }: any) {
+  return (
+    <div>
+      <label className="block text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-1">{label}</label>
+      {children}
+    </div>
+  );
+}
+function Input({ value, onChange, type = "text" }: any) {
+  return (
+    <input type={type} value={value} onChange={(e) => onChange(e.target.value)}
+      className="w-full bg-[#0f131a] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#00d4ff]/40" />
   );
 }

@@ -1612,6 +1612,42 @@ export async function createPatientProfile(
   }
 }
 
+/**
+ * Admin: create a brand-new patient (auth.user + profile).
+ * Calls a Netlify Function that uses the service role key on the server.
+ * Falls back to a clear error message if env is not configured.
+ */
+export async function adminCreatePatient(payload: {
+  full_name: string;
+  email: string;
+  phone?: string;
+  rut_dni?: string;
+  send_invite?: boolean;
+}): Promise<{ success: boolean; user_id?: string; error?: string }> {
+  try {
+    const { data: sess } = await supabase.auth.getSession();
+    const token = sess?.session?.access_token;
+    if (!token) return { success: false, error: "No estás autenticado" };
+
+    const res = await fetch("/.netlify/functions/admin-create-patient", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const msg = json.error || `HTTP ${res.status}`;
+      return { success: false, error: msg };
+    }
+    return { success: true, user_id: json.user_id };
+  } catch (e) {
+    return { success: false, error: String(e) };
+  }
+}
+
 export async function deletePatient(
   id: string
 ): Promise<{ success: boolean; error?: string }> {
