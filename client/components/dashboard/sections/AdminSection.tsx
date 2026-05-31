@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Shield, Users, Package, UserCheck } from "lucide-react";
-import StudentsList from "@/components/dashboard/StudentsList";
+import PatientsList from "@/components/dashboard/PatientsList";
 import AdminPlansManager from "@/components/admin/AdminPlansManager";
 import AdminPlanAssignment from "@/components/admin/AdminPlanAssignment";
 
@@ -14,10 +14,6 @@ const TABS: { value: AdminTab; label: string; icon: any }[] = [
 
 export default function AdminSection() {
   const [tab, setTab] = useState<AdminTab>("students");
-
-  const handleViewStudentDetails = (studentId: string) => {
-    console.log("View student details:", studentId);
-  };
 
   return (
     <div>
@@ -54,7 +50,7 @@ export default function AdminSection() {
         })}
       </div>
 
-      {tab === "students" && <StudentsList onViewDetails={handleViewStudentDetails} />}
+      {tab === "students" && <PatientsList />}
       {tab === "plans" && <AdminPlansManager />}
       {tab === "assignments" && <AdminPlanAssignment />}
     </div>

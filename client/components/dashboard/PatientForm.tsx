@@ -1,0 +1,439 @@
+import { useState, useEffect } from "react";
+import { ChevronDown, ChevronUp, Save, Loader2, Plus, X } from "lucide-react";
+import { toast } from "sonner";
+import {
+  getPatient,
+  updatePatient,
+  createPatientProfile,
+  computeAge,
+  computeBMI,
+  bmiCategory,
+  type PatientProfile,
+  type SportEntry,
+  type SubstanceEntry,
+  type MedicationEntry,
+} from "@/services/supabase";
+
+// List of common conditions (checkboxes)
+const COMMON_DISEASES = [
+  { key: "diabetes_t1", label: "Diabetes tipo 1" },
+  { key: "diabetes_t2", label: "Diabetes tipo 2" },
+  { key: "hipertension", label: "Hipertensión arterial" },
+  { key: "asma", label: "Asma" },
+  { key: "epilepsia", label: "Epilepsia" },
+  { key: "cardio", label: "Cardiopatía / arritmia" },
+  { key: "tiroides", label: "Trastorno tiroideo" },
+  { key: "anemia", label: "Anemia" },
+  { key: "artrosis", label: "Artrosis / artritis" },
+  { key: "osteoporosis", label: "Osteoporosis" },
+  { key: "fibromialgia", label: "Fibromialgia" },
+  { key: "depresion", label: "Depresión" },
+  { key: "ansiedad", label: "Ansiedad" },
+  { key: "embarazo", label: "Embarazo" },
+  { key: "lactancia", label: "Lactancia" },
+  { key: "colon_irritable", label: "Colon irritable" },
+  { key: "reflujo", label: "Reflujo gastroesofágico" },
+  { key: "migraña", label: "Migraña crónica" },
+  { key: "marcapasos", label: "Marcapasos / dispositivo" },
+  { key: "cancer", label: "Cáncer (actual/remisión)" },
+];
+
+interface PatientFormProps {
+  patientId?: string; // if provided, edit mode
+  onSaved: () => void;
+  onCancel: () => void;
+}
+
+const EMPTY: Partial<PatientProfile> = {
+  full_name: "",
+  email: "",
+  rut_dni: "",
+  birth_date: "",
+  gender: "",
+  marital_status: "",
+  has_children: false,
+  num_children: 0,
+  phone: "",
+  address: "",
+  profession: "",
+  occupation: "",
+  height_cm: undefined,
+  weight_kg: undefined,
+  body_fat_pct: undefined,
+  muscle_mass_pct: undefined,
+  bone_mass_pct: undefined,
+  activity_level: "",
+  objective: "",
+  handedness: "",
+  blood_type: "",
+  allergies: "",
+  diseases: [],
+  surgeries: "",
+  ailments: "",
+  injuries: "",
+  sports: [],
+  drugs: [],
+  medications: [],
+  emergency_contact_name: "",
+  emergency_contact_phone: "",
+  emergency_contact_relation: "",
+  medical_info_extra: "",
+  personal_info_extra: "",
+  insurer: "",
+  referral_source: "",
+  informed_consent_signed: false,
+};
+
+type SectionId =
+  | "personal" | "professional" | "body" | "goals" | "medical"
+  | "conditions" | "sports" | "substances" | "emergency" | "extra" | "admin";
+
+export default function PatientForm({ patientId, onSaved, onCancel }: PatientFormProps) {
+  const [form, setForm] = useState<Partial<PatientProfile>>(EMPTY);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [open, setOpen] = useState<Record<SectionId, boolean>>({
+    personal: true, professional: false, body: false, goals: false,
+    medical: false, conditions: false, sports: false, substances: false,
+    emergency: false, extra: false, admin: false,
+  });
+
+  useEffect(() => {
+    if (patientId) {
+      setLoading(true);
+      getPatient(patientId).then((res) => {
+        if (res.success && res.data) setForm({ ...EMPTY, ...res.data });
+        else toast.error(`Error: ${res.error}`);
+        setLoading(false);
+      });
+    }
+  }, [patientId]);
+
+  const set = <K extends keyof PatientProfile>(k: K, v: PatientProfile[K]) =>
+    setForm((f) => ({ ...f, [k]: v }));
+  const toggle = (id: SectionId) => setOpen((o) => ({ ...o, [id]: !o[id] }));
+
+  const age = computeAge(form.birth_date as string | undefined);
+  const bmi = computeBMI(form.height_cm as number, form.weight_kg as number);
+
+  const toggleDisease = (k: string) =>
+    set("diseases", (form.diseases || []).includes(k)
+      ? (form.diseases || []).filter((d) => d !== k)
+      : [...(form.diseases || []), k]);
+
+  const addRow = <T,>(field: "sports" | "drugs" | "medications", row: T) => {
+    const arr: any[] = (form as any)[field] || [];
+    set(field as any, [...arr, row] as any);
+  };
+  const removeRow = (field: "sports" | "drugs" | "medications", idx: number) => {
+    const arr: any[] = (form as any)[field] || [];
+    set(field as any, arr.filter((_, i) => i !== idx) as any);
+  };
+  const updateRow = (field: "sports" | "drugs" | "medications", idx: number, patch: any) => {
+    const arr: any[] = (form as any)[field] || [];
+    set(field as any, arr.map((r, i) => (i === idx ? { ...r, ...patch } : r)) as any);
+  };
+
+  const handleSave = async () => {
+    if (!form.full_name?.trim()) {
+      toast.error("Nombre completo es requerido");
+      setOpen((o) => ({ ...o, personal: true }));
+      return;
+    }
+    setSaving(true);
+    if (patientId) {
+      const res = await updatePatient(patientId, form);
+      if (res.success) {
+        toast.success("Paciente actualizado");
+        onSaved();
+      } else toast.error(`Error: ${res.error}`);
+    } else {
+      // Create flow: requires the student to already exist in auth.users
+      toast.error(
+        "Para crear un paciente nuevo, primero debe registrarse desde /login (signup). Luego edita su perfil aquí."
+      );
+    }
+    setSaving(false);
+  };
+
+  if (loading) {
+    return (
+      <div className="py-12 flex items-center justify-center text-gray-500">
+        <Loader2 className="w-5 h-5 animate-spin mr-2" /> Cargando...
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <Section id="personal" title="Datos personales" open={open.personal} onToggle={toggle}>
+        <Grid>
+          <Field label="Nombre completo *"><Input value={form.full_name || ""} onChange={(v) => set("full_name", v)} /></Field>
+          <Field label="RUT / DNI"><Input value={form.rut_dni || ""} onChange={(v) => set("rut_dni", v)} /></Field>
+          <Field label="Email"><Input type="email" value={form.email || ""} onChange={(v) => set("email", v)} /></Field>
+          <Field label="Teléfono"><Input value={form.phone || ""} onChange={(v) => set("phone", v)} /></Field>
+          <Field label={`Fecha de nacimiento ${age != null ? `(${age} años)` : ""}`}>
+            <Input type="date" value={form.birth_date || ""} onChange={(v) => set("birth_date", v)} />
+          </Field>
+          <Field label="Género">
+            <Select value={form.gender || ""} onChange={(v) => set("gender", v)}
+              options={[["", "—"], ["M", "Masculino"], ["F", "Femenino"], ["X", "Otro / Prefiere no decir"]]} />
+          </Field>
+          <Field label="Estado civil">
+            <Select value={form.marital_status || ""} onChange={(v) => set("marital_status", v as any)}
+              options={[["", "—"], ["soltero", "Soltero/a"], ["casado", "Casado/a"], ["conviviente", "Conviviente"], ["divorciado", "Divorciado/a"], ["viudo", "Viudo/a"], ["otro", "Otro"]]} />
+          </Field>
+          <Field label="Hijos">
+            <div className="flex gap-2">
+              <label className="flex items-center gap-1 text-sm text-white">
+                <input type="checkbox" checked={!!form.has_children}
+                  onChange={(e) => set("has_children", e.target.checked)} />
+                Sí
+              </label>
+              {form.has_children && (
+                <Input type="number" value={String(form.num_children ?? 0)}
+                  onChange={(v) => set("num_children", parseInt(v) || 0)} className="w-16" />
+              )}
+            </div>
+          </Field>
+          <Field label="Dirección" full><Input value={form.address || ""} onChange={(v) => set("address", v)} /></Field>
+        </Grid>
+      </Section>
+
+      <Section id="professional" title="Datos profesionales" open={open.professional} onToggle={toggle}>
+        <Grid>
+          <Field label="Profesión"><Input value={form.profession || ""} onChange={(v) => set("profession", v)} /></Field>
+          <Field label="Labor actual"><Input value={form.occupation || ""} onChange={(v) => set("occupation", v)} /></Field>
+        </Grid>
+      </Section>
+
+      <Section id="body" title="Composición corporal" open={open.body} onToggle={toggle}>
+        <Grid>
+          <Field label="Estatura (cm)"><Input type="number" value={String(form.height_cm ?? "")} onChange={(v) => set("height_cm", parseFloat(v) || (undefined as any))} /></Field>
+          <Field label="Peso (kg)"><Input type="number" value={String(form.weight_kg ?? "")} onChange={(v) => set("weight_kg", parseFloat(v) || (undefined as any))} /></Field>
+          <Field label={`IMC ${bmi ? `(${bmi} — ${bmiCategory(bmi)})` : ""}`}>
+            <Input value={bmi ? String(bmi) : ""} disabled />
+          </Field>
+          <Field label="Masa adiposa (%)"><Input type="number" value={String(form.body_fat_pct ?? "")} onChange={(v) => set("body_fat_pct", parseFloat(v) || (undefined as any))} /></Field>
+          <Field label="Masa muscular (%)"><Input type="number" value={String(form.muscle_mass_pct ?? "")} onChange={(v) => set("muscle_mass_pct", parseFloat(v) || (undefined as any))} /></Field>
+          <Field label="Masa ósea (%)"><Input type="number" value={String(form.bone_mass_pct ?? "")} onChange={(v) => set("bone_mass_pct", parseFloat(v) || (undefined as any))} /></Field>
+        </Grid>
+      </Section>
+
+      <Section id="goals" title="Actividad y objetivos" open={open.goals} onToggle={toggle}>
+        <Grid>
+          <Field label="Nivel de actividad física">
+            <Select value={form.activity_level || ""} onChange={(v) => set("activity_level", v as any)}
+              options={[
+                ["", "—"], ["sedentario", "Sedentario"], ["ligero", "Ligero"],
+                ["moderado", "Moderado"], ["activo", "Activo"], ["muy_activo", "Muy activo"], ["atleta", "Atleta"],
+              ]} />
+          </Field>
+          <Field label="Lateralidad">
+            <Select value={form.handedness || ""} onChange={(v) => set("handedness", v as any)}
+              options={[["", "—"], ["diestro", "Diestro"], ["zurdo", "Zurdo"], ["ambidiestro", "Ambidiestro"]]} />
+          </Field>
+          <Field label="Objetivo" full>
+            <Textarea value={form.objective || ""} onChange={(v) => set("objective", v)} rows={2} placeholder="Ej: rehabilitación post-cirugía, ganar fuerza, perder grasa…" />
+          </Field>
+        </Grid>
+      </Section>
+
+      <Section id="medical" title="Datos médicos básicos" open={open.medical} onToggle={toggle}>
+        <Grid>
+          <Field label="Tipo de sangre">
+            <Select value={form.blood_type || ""} onChange={(v) => set("blood_type", v as any)}
+              options={[["", "—"], ["A+", "A+"], ["A-", "A-"], ["B+", "B+"], ["B-", "B-"], ["AB+", "AB+"], ["AB-", "AB-"], ["O+", "O+"], ["O-", "O-"]]} />
+          </Field>
+          <Field label="Aseguradora">
+            <Select value={form.insurer || ""} onChange={(v) => set("insurer", v)}
+              options={[["", "—"], ["Fonasa", "Fonasa"], ["Isapre", "Isapre"], ["Particular", "Particular"], ["Otro", "Otro"]]} />
+          </Field>
+          <Field label="Alergias" full><Textarea value={form.allergies || ""} onChange={(v) => set("allergies", v)} rows={2} /></Field>
+          <Field label="Cirugías" full><Textarea value={form.surgeries || ""} onChange={(v) => set("surgeries", v)} rows={2} placeholder="Tipo, fecha aprox., complicaciones..." /></Field>
+          <Field label="Dolencias actuales" full><Textarea value={form.ailments || ""} onChange={(v) => set("ailments", v)} rows={2} /></Field>
+          <Field label="Lesiones (actuales/pasadas)" full><Textarea value={form.injuries || ""} onChange={(v) => set("injuries", v)} rows={2} /></Field>
+        </Grid>
+      </Section>
+
+      <Section id="conditions" title="Enfermedades / condiciones a considerar" open={open.conditions} onToggle={toggle}>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+          {COMMON_DISEASES.map((d) => {
+            const checked = (form.diseases || []).includes(d.key);
+            return (
+              <label key={d.key}
+                className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition ${
+                  checked ? "bg-rose-500/10 border-rose-500/30 text-rose-200" : "bg-[#0f131a] border-white/10 text-gray-400 hover:text-white"
+                }`}>
+                <input type="checkbox" checked={checked} onChange={() => toggleDisease(d.key)} />
+                <span className="text-xs">{d.label}</span>
+              </label>
+            );
+          })}
+        </div>
+      </Section>
+
+      <Section id="sports" title="Deportes que practica" open={open.sports} onToggle={toggle}>
+        <RepeatRows
+          items={(form.sports as SportEntry[]) || []}
+          onAdd={() => addRow<SportEntry>("sports", { name: "", since: "", frequency_per_week: undefined })}
+          onRemove={(i) => removeRow("sports", i)}
+          render={(row, i) => (
+            <>
+              <Input value={row.name} onChange={(v) => updateRow("sports", i, { name: v })} placeholder="Deporte" className="flex-1 min-w-[140px]" />
+              <Input value={row.since || ""} onChange={(v) => updateRow("sports", i, { since: v })} placeholder="Desde (YYYY)" className="w-32" />
+              <Input type="number" value={String(row.frequency_per_week ?? "")} onChange={(v) => updateRow("sports", i, { frequency_per_week: parseInt(v) || undefined })} placeholder="x/sem" className="w-24" />
+            </>
+          )} />
+      </Section>
+
+      <Section id="substances" title="Medicamentos y sustancias" open={open.substances} onToggle={toggle}>
+        <p className="text-xs text-gray-500 mb-2 font-semibold uppercase">Medicamentos</p>
+        <RepeatRows
+          items={(form.medications as MedicationEntry[]) || []}
+          onAdd={() => addRow<MedicationEntry>("medications", { name: "", dose: "", frequency: "", since: "" })}
+          onRemove={(i) => removeRow("medications", i)}
+          render={(row, i) => (
+            <>
+              <Input value={row.name} onChange={(v) => updateRow("medications", i, { name: v })} placeholder="Medicamento" className="flex-1 min-w-[140px]" />
+              <Input value={row.dose || ""} onChange={(v) => updateRow("medications", i, { dose: v })} placeholder="Dosis" className="w-28" />
+              <Input value={row.frequency || ""} onChange={(v) => updateRow("medications", i, { frequency: v })} placeholder="Frecuencia" className="w-32" />
+              <Input value={row.since || ""} onChange={(v) => updateRow("medications", i, { since: v })} placeholder="Desde" className="w-28" />
+            </>
+          )} />
+        <p className="text-xs text-gray-500 mt-4 mb-2 font-semibold uppercase">Drogas / sustancias recreativas</p>
+        <RepeatRows
+          items={(form.drugs as SubstanceEntry[]) || []}
+          onAdd={() => addRow<SubstanceEntry>("drugs", { name: "", frequency: "", since: "" })}
+          onRemove={(i) => removeRow("drugs", i)}
+          render={(row, i) => (
+            <>
+              <Input value={row.name} onChange={(v) => updateRow("drugs", i, { name: v })} placeholder="Sustancia" className="flex-1 min-w-[140px]" />
+              <Input value={row.frequency || ""} onChange={(v) => updateRow("drugs", i, { frequency: v })} placeholder="Frecuencia" className="w-32" />
+              <Input value={row.since || ""} onChange={(v) => updateRow("drugs", i, { since: v })} placeholder="Desde" className="w-28" />
+            </>
+          )} />
+      </Section>
+
+      <Section id="emergency" title="Contacto de emergencia" open={open.emergency} onToggle={toggle}>
+        <Grid>
+          <Field label="Nombre"><Input value={form.emergency_contact_name || ""} onChange={(v) => set("emergency_contact_name", v)} /></Field>
+          <Field label="Teléfono"><Input value={form.emergency_contact_phone || ""} onChange={(v) => set("emergency_contact_phone", v)} /></Field>
+          <Field label="Relación"><Input value={form.emergency_contact_relation || ""} onChange={(v) => set("emergency_contact_relation", v)} placeholder="Padre, pareja, amigo…" /></Field>
+        </Grid>
+      </Section>
+
+      <Section id="extra" title="Información adicional" open={open.extra} onToggle={toggle}>
+        <Grid>
+          <Field label="Información médica extra importante" full>
+            <Textarea value={form.medical_info_extra || ""} onChange={(v) => set("medical_info_extra", v)} rows={3} />
+          </Field>
+          <Field label="Información personal importante" full>
+            <Textarea value={form.personal_info_extra || ""} onChange={(v) => set("personal_info_extra", v)} rows={3} />
+          </Field>
+          <Field label="URL Foto (opcional)"><Input value={form.photo_url || ""} onChange={(v) => set("photo_url", v)} placeholder="https://..." /></Field>
+        </Grid>
+      </Section>
+
+      <Section id="admin" title="Datos administrativos" open={open.admin} onToggle={toggle}>
+        <Grid>
+          <Field label="Cómo nos conoció">
+            <Select value={form.referral_source || ""} onChange={(v) => set("referral_source", v)}
+              options={[["", "—"], ["instagram", "Instagram"], ["facebook", "Facebook"], ["google", "Google"], ["referido", "Referido por otro alumno"], ["medico", "Recomendación médica"], ["otro", "Otro"]]} />
+          </Field>
+          <Field label="Consentimiento informado">
+            <label className="flex items-center gap-2 text-sm text-white">
+              <input type="checkbox" checked={!!form.informed_consent_signed}
+                onChange={(e) => set("informed_consent_signed", e.target.checked)} />
+              Firmado
+            </label>
+          </Field>
+        </Grid>
+      </Section>
+
+      {/* Sticky save bar */}
+      <div className="sticky bottom-0 bg-[#0a0e1a] border-t border-white/10 p-3 flex justify-end gap-2 -mx-6 -mb-6 mt-4 px-6">
+        <button onClick={onCancel}
+          className="px-4 py-2 rounded-lg bg-white/[0.05] border border-white/10 text-white text-sm font-semibold hover:bg-white/[0.08] transition">
+          Cancelar
+        </button>
+        <button onClick={handleSave} disabled={saving}
+          className="px-4 py-2 rounded-lg bg-[#00d4ff] hover:bg-cyan-300 text-[#05050A] text-sm font-bold font-lexend transition flex items-center gap-2 disabled:opacity-40">
+          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+          Guardar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ----- helpers -----
+function Section({ id, title, open, onToggle, children }: any) {
+  return (
+    <div className="bg-[#0f131a] border border-white/[0.06] rounded-xl overflow-hidden">
+      <button onClick={() => onToggle(id)}
+        className="w-full px-4 py-3 flex items-center justify-between hover:bg-white/[0.02] transition">
+        <span className="text-white font-semibold font-lexend text-sm">{title}</span>
+        {open ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+      </button>
+      {open && <div className="p-4 border-t border-white/[0.04]">{children}</div>}
+    </div>
+  );
+}
+function Grid({ children }: any) {
+  return <div className="grid grid-cols-1 md:grid-cols-2 gap-3">{children}</div>;
+}
+function Field({ label, children, full }: any) {
+  return (
+    <div className={full ? "md:col-span-2" : ""}>
+      <label className="block text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-1">{label}</label>
+      {children}
+    </div>
+  );
+}
+function Input({ value, onChange, type = "text", placeholder, className = "", disabled }: any) {
+  return (
+    <input type={type} value={value} disabled={disabled} placeholder={placeholder}
+      onChange={(e) => onChange(e.target.value)}
+      className={`w-full bg-[#0a0e1a] border border-white/10 rounded-lg px-3 py-2 text-sm text-white font-inter focus:outline-none focus:border-[#00d4ff]/40 disabled:opacity-50 ${className}`} />
+  );
+}
+function Textarea({ value, onChange, rows = 3, placeholder }: any) {
+  return (
+    <textarea value={value} rows={rows} placeholder={placeholder}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full bg-[#0a0e1a] border border-white/10 rounded-lg px-3 py-2 text-sm text-white font-inter focus:outline-none focus:border-[#00d4ff]/40" />
+  );
+}
+function Select({ value, onChange, options }: any) {
+  return (
+    <select value={value} onChange={(e) => onChange(e.target.value)}
+      className="w-full bg-[#0a0e1a] border border-white/10 rounded-lg px-3 py-2 text-sm text-white font-inter focus:outline-none focus:border-[#00d4ff]/40">
+      {options.map(([v, l]: [string, string]) => (
+        <option key={v} value={v}>{l}</option>
+      ))}
+    </select>
+  );
+}
+function RepeatRows<T>({ items, onAdd, onRemove, render }: {
+  items: T[]; onAdd: () => void; onRemove: (i: number) => void;
+  render: (row: T, i: number) => any;
+}) {
+  return (
+    <div className="space-y-2">
+      {items.map((row, i) => (
+        <div key={i} className="flex flex-wrap gap-2 items-start">
+          {render(row, i)}
+          <button type="button" onClick={() => onRemove(i)}
+            className="p-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      ))}
+      <button type="button" onClick={onAdd}
+        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/[0.05] border border-white/10 text-white text-xs font-semibold hover:bg-white/[0.08] transition">
+        <Plus className="w-3.5 h-3.5" /> Agregar
+      </button>
+    </div>
+  );
+}
