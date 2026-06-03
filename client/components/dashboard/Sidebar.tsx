@@ -55,7 +55,23 @@ export default function Sidebar({
   onTabChange,
 }: SidebarProps) {
   const navigate = useNavigate();
-  const { signOut, isAdmin } = useAuth();
+  const { signOut, isAdmin, user } = useAuth();
+
+  const displayName =
+    (user?.user_metadata as { full_name?: string } | null)?.full_name ||
+    user?.email?.split("@")[0] ||
+    "Usuario";
+  const initials = displayName
+    .split(/\s+/)
+    .map((p: string) => p[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+  const roleLabel = userRole === "student"
+    ? "Alumno"
+    : isAdmin
+    ? "Administrador"
+    : "Profesional";
 
   const baseItems = userRole === "student" ? studentNavItems : teacherNavItems;
   const navItems =
@@ -132,9 +148,10 @@ export default function Sidebar({
                   onClick={() => handleTabClick(tabId)}
                   className={`
                     w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium font-lexend
-                    transition-all duration-150 group relative text-left
+                    transition-all duration-200 ease-out group relative text-left
+                    active:scale-[0.98]
                     ${active
-                      ? "text-[#00d4ff] bg-[#00d4ff]/[0.07]"
+                      ? "text-[#00d4ff] bg-[#00d4ff]/[0.08]"
                       : "text-gray-500 hover:text-gray-200 hover:bg-white/[0.04]"
                     }
                   `}
@@ -154,11 +171,25 @@ export default function Sidebar({
           </div>
         </nav>
 
-        {/* Bottom — logout */}
-        <div className="px-4 pb-5 pt-3 border-t border-white/[0.06]">
+        {/* Bottom — user + logout */}
+        <div className="px-4 pb-5 pt-3 border-t border-white/[0.06] space-y-2">
+          {/* User identity chip */}
+          <div className="flex items-center gap-2.5 px-2 py-2 rounded-lg bg-white/[0.03]">
+            <div className="w-8 h-8 rounded-full bg-cyan-400/15 border border-cyan-400/30 text-cyan-300 text-xs font-bold flex items-center justify-center flex-shrink-0">
+              {initials}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-semibold text-white truncate font-lexend">
+                {displayName}
+              </div>
+              <div className="text-[9px] uppercase tracking-[0.12em] text-gray-500 mt-0.5">
+                {roleLabel}
+              </div>
+            </div>
+          </div>
           <button
             onClick={handleLogout}
-            className="flex items-center gap-2.5 w-full text-gray-500 hover:text-rose-400 text-sm transition px-2 py-2 rounded-lg hover:bg-rose-500/[0.06] font-lexend"
+            className="flex items-center gap-2.5 w-full text-gray-500 hover:text-rose-400 text-sm transition-colors px-2 py-2 rounded-lg hover:bg-rose-500/[0.06] font-lexend active:scale-[0.98]"
           >
             <LogOut className="w-4 h-4" />
             Cerrar Sesión

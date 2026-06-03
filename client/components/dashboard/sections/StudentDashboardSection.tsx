@@ -181,7 +181,7 @@ export default function StudentDashboardSection() {
       )}
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
         <StatCard
           label="Sesiones Próximas"
           value={String(bookings.filter((b) => new Date(b.booking_date) >= new Date()).length)}
