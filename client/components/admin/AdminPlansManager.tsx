@@ -27,6 +27,25 @@ const SESSION_TYPE_OPTIONS: { value: SessionType; label: string }[] = [
   { value: "otra", label: "Otra" },
 ];
 
+// Small labelled-field wrapper used by the visibility + badge inputs.
+// Matches the existing label pattern used elsewhere in this form.
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <label className="text-xs font-inter text-gray-400 uppercase mb-1.5 block">
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
 const emptyPlan = (): Omit<PlanTemplate, "id" | "created_at" | "updated_at"> => ({
   name: "",
   description: "",
