@@ -118,3 +118,59 @@
     white-space: pre;
   }
 }
+
+@layer components {
+  /* HTK Typography scale — editorial/display register */
+  .htk-display {
+    font-family: "Bebas Neue", Anton, Impact, sans-serif;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    line-height: 0.9;
+    text-transform: uppercase;
+    text-wrap: balance;
+  }
+  .htk-h1 { @apply htk-display text-5xl sm:text-7xl lg:text-8xl; }
+  .htk-h2 { @apply htk-display text-4xl sm:text-5xl lg:text-6xl; }
+  .htk-h3 { @apply htk-display text-3xl sm:text-4xl; }
+  .htk-eyebrow {
+    @apply inline-flex items-center gap-1.5 text-[10px] sm:text-xs uppercase font-semibold tracking-[0.18em] text-cyan-400;
+  }
+  .htk-body { @apply text-sm sm:text-base text-gray-300 leading-relaxed; }
+
+  /* Chip-style badges */
+  .htk-chip {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full
+           text-[10px] uppercase tracking-[0.14em] font-semibold
+           bg-white/[0.04] border border-white/[0.08] text-gray-300;
+  }
+  .htk-chip-accent {
+    @apply bg-cyan-400/10 border-cyan-400/25 text-cyan-300;
+  }
+
+  /* Section divider — thin accent rule */
+  .htk-divider {
+    background: linear-gradient(90deg, transparent, rgba(0,212,255,0.35), transparent);
+    @apply h-px w-full;
+  }
+
+  /* Bottom-nav safe area for dashboards */
+  .htk-bottom-safe { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
+
+  /* Skeleton shimmer */
+  .htk-skel {
+    @apply relative overflow-hidden bg-white/[0.04] rounded-lg;
+  }
+  .htk-skel::after {
+    content: "";
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent);
+    transform: translateX(-100%);
+    animation: htk-shimmer 1.4s ease-in-out infinite;
+  }
+  @keyframes htk-shimmer {
+    100% { transform: translateX(100%); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .htk-skel::after { animation: none; }
+  }
+}
