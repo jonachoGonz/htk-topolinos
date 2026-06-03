@@ -36,7 +36,7 @@ export default function TeacherDashboard() {
         <DashboardTopBar onMenuToggle={() => setSidebarOpen(true)} activeTab={activeTab} onTabChange={setActiveTab} />
 
         {/* Scrollable content */}
-        <main className="flex-1 overflow-y-auto bg-[#0a0e1a] p-5 lg:p-6 htk-bottom-safe lg:!pb-6">
+        <main className="flex-1 overflow-y-auto bg-[#0a0e1a] px-5 pt-5 lg:px-6 lg:pt-6 pb-[calc(80px+env(safe-area-inset-bottom))] lg:pb-6">
           {activeTab === "dashboard" && <DashboardSection />}
           {activeTab === "calendar" && <CalendarSection professionalId={user?.id || ""} />}
           {activeTab === "patients" && <PatientsSection professionalId={user?.id || ""} />}

@@ -153,8 +153,12 @@
     @apply h-px w-full;
   }
 
-  /* Bottom-nav safe area for dashboards */
-  .htk-bottom-safe { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
+  /* Bottom-nav safe area for dashboards.
+     Marked !important because Tailwind utilities like `p-5` would otherwise
+     win on specificity grounds and clip the bottom of the content under the
+     fixed BottomNav on mobile. Prefer Tailwind arbitrary value
+     `pb-[calc(80px+env(safe-area-inset-bottom))]` in new code. */
+  .htk-bottom-safe { padding-bottom: calc(80px + env(safe-area-inset-bottom)) !important; }
 
   /* Skeleton shimmer */
   .htk-skel {
