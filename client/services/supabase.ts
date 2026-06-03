@@ -952,6 +952,128 @@ export async function getBookingsForSlot(
 }
 
 /**
+ * Fetch the professional's schedule for a date range, joining each booking
+ * with the student profile and the underlying availability slot so the UI can
+ * render "X/Y cupos" + the student list per slot in one round trip.
+ *
+ * Returns slots grouped by (booking_date, start_time). One row per slot, with
+ * an array of bookings inside.
+ */
+export interface ScheduleSlot {
+  date: string;            // YYYY-MM-DD
+  day_of_week: number;     // 0=Mon..6=Sun (DB convention)
+  start_time: string;      // HH:MM:SS or HH:MM
+  end_time: string;
+  professional_type: "kinesiologist" | "nutritionist" | "therapist" | string;
+  capacity: number;        // from availability.max_capacity (0 if not found)
+  booked: number;          // bookings.length
+  attended_count: number;  // bookings with attended=true
+  pending_attendance: number; // bookings with attended IS NULL
+  bookings: Array<{
+    id: string;
+    student_id: string;
+    student_name: string;
+    attended: boolean | null;
+    charged_from_plan: boolean | null;
+    status: string;
+  }>;
+}
+
+export async function getProfessionalSchedule(
+  professionalId: string,
+  fromDate: string, // YYYY-MM-DD inclusive
+  toDate: string,   // YYYY-MM-DD inclusive
+): Promise<{ success: boolean; data?: ScheduleSlot[]; error?: string }> {
+  try {
+    // 1) Bookings in the range
+    const { data: rows, error } = await supabase
+      .from("bookings")
+      .select(
+        `id, student_id, booking_date, start_time, end_time, status,
+         attended, charged_from_plan, professional_type,
+         student:profiles!bookings_student_id_fkey(id, full_name)`,
+      )
+      .eq("professional_id", professionalId)
+      .gte("booking_date", fromDate)
+      .lte("booking_date", toDate)
+      .eq("status", "confirmed")
+      .order("booking_date", { ascending: true })
+      .order("start_time", { ascending: true });
+    if (error) return { success: false, error: error.message };
+
+    // 2) Recurring availabilities for capacity lookup, keyed by (day_of_week, HH:MM)
+    const { data: avail } = await supabase
+      .from("availability")
+      .select("day_of_week, start_time, max_capacity, professional_type")
+      .eq("professional_id", professionalId);
+
+    const capMap = new Map<string, { capacity: number; type: string }>();
+    (avail || []).forEach((a: any) => {
+      const key = `${a.day_of_week}|${String(a.start_time).slice(0, 5)}`;
+      capMap.set(key, {
+        capacity: a.max_capacity ?? 0,
+        type: a.professional_type ?? "kinesiologist",
+      });
+    });
+
+    // 3) Group bookings by (date, start_time)
+    type Group = ScheduleSlot;
+    const groups = new Map<string, Group>();
+
+    for (const b of rows || []) {
+      const date: string = b.booking_date;
+      const start: string = String(b.start_time).slice(0, 5);
+      const key = `${date}|${start}`;
+      // Convert JS getDay (0=Sun..6=Sat) to DB convention (0=Mon..6=Sun)
+      const jsDow = new Date(date + "T00:00:00").getDay();
+      const dow = jsDow === 0 ? 6 : jsDow - 1;
+      const capKey = `${dow}|${start}`;
+      const cap = capMap.get(capKey);
+
+      let g = groups.get(key);
+      if (!g) {
+        g = {
+          date,
+          day_of_week: dow,
+          start_time: start,
+          end_time: String(b.end_time).slice(0, 5),
+          professional_type:
+            b.professional_type || cap?.type || "kinesiologist",
+          capacity: cap?.capacity ?? 0,
+          booked: 0,
+          attended_count: 0,
+          pending_attendance: 0,
+          bookings: [],
+        };
+        groups.set(key, g);
+      }
+      // Supabase nested select can return an array or single object
+      const studentObj = Array.isArray(b.student) ? b.student[0] : b.student;
+      g.bookings.push({
+        id: b.id,
+        student_id: b.student_id,
+        student_name: studentObj?.full_name ?? "Sin nombre",
+        attended: b.attended ?? null,
+        charged_from_plan: b.charged_from_plan ?? null,
+        status: b.status,
+      });
+      g.booked += 1;
+      if (b.attended === true) g.attended_count += 1;
+      else if (b.attended === null || b.attended === undefined) g.pending_attendance += 1;
+    }
+
+    // Sort by date then start_time
+    const sorted = Array.from(groups.values()).sort((a, b) =>
+      a.date === b.date ? a.start_time.localeCompare(b.start_time) : a.date.localeCompare(b.date),
+    );
+
+    return { success: true, data: sorted };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+}
+
+/**
  * Confirm or unconfirm attendance for a booking.
  * If attended=true AND professional is kinesiologist/therapist (not nutritionist) AND not yet charged,
  * automatically deducts 1 session from the student's active plan.

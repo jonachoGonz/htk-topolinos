@@ -37,7 +37,7 @@ export default function TeacherDashboard() {
 
         {/* Scrollable content */}
         <main className="flex-1 overflow-y-auto bg-[#0a0e1a] px-5 pt-5 lg:px-6 lg:pt-6 pb-[calc(80px+env(safe-area-inset-bottom))] lg:pb-6">
-          {activeTab === "dashboard" && <DashboardSection />}
+          {activeTab === "dashboard" && <DashboardSection onNavigate={setActiveTab} />}
           {activeTab === "calendar" && <CalendarSection professionalId={user?.id || ""} />}
           {activeTab === "patients" && <PatientsSection professionalId={user?.id || ""} />}
           {activeTab === "messages" && <MessagingPanel />}
