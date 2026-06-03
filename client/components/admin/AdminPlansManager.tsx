@@ -27,6 +27,25 @@ const SESSION_TYPE_OPTIONS: { value: SessionType; label: string }[] = [
   { value: "otra", label: "Otra" },
 ];
 
+// Small labelled-field wrapper used by the visibility + badge inputs.
+// Matches the existing label pattern used elsewhere in this form.
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <label className="text-xs font-inter text-gray-400 uppercase mb-1.5 block">
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
 const emptyPlan = (): Omit<PlanTemplate, "id" | "created_at" | "updated_at"> => ({
   name: "",
   description: "",
@@ -141,8 +160,10 @@ export default function AdminPlansManager() {
       toast.error("Nombre del plan requerido");
       return;
     }
-    if (form.monthly_classes < 0) {
-      toast.error("Clases mensuales no puede ser negativo");
+    if (!Number.isFinite(form.monthly_classes) || form.monthly_classes < 1) {
+      // DB has CHECK (sessions_per_month > 0); 0 would pass the old client
+      // check and then explode in Supabase with an obscure constraint error.
+      toast.error("Las clases mensuales deben ser al menos 1");
       return;
     }
     if (form.accepts_discount_codes && !form.discount_code?.trim()) {
