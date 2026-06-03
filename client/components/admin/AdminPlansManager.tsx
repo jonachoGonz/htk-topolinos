@@ -141,8 +141,10 @@ export default function AdminPlansManager() {
       toast.error("Nombre del plan requerido");
       return;
     }
-    if (form.monthly_classes < 0) {
-      toast.error("Clases mensuales no puede ser negativo");
+    if (!Number.isFinite(form.monthly_classes) || form.monthly_classes < 1) {
+      // DB has CHECK (sessions_per_month > 0); 0 would pass the old client
+      // check and then explode in Supabase with an obscure constraint error.
+      toast.error("Las clases mensuales deben ser al menos 1");
       return;
     }
     if (form.accepts_discount_codes && !form.discount_code?.trim()) {
