@@ -2093,16 +2093,29 @@ export async function updatePlanTemplate(
   }
 }
 
+/**
+ * Delete a plan template.
+ * - `hard: false` (default) → soft-delete (is_active=false). Preserves history.
+ * - `hard: true` → permanent DELETE. Use only when the plan is already inactive
+ *   AND the admin explicitly opts in (double confirm in UI).
+ */
 export async function deletePlanTemplate(
-  id: string
+  id: string,
+  opts: { hard?: boolean } = {},
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    // Soft-delete: mark inactive instead of hard delete (preserves history)
+    if (opts.hard) {
+      const { error } = await supabase
+        .from("plan_templates")
+        .delete()
+        .eq("id", id);
+      if (error) return { success: false, error: error.message };
+      return { success: true };
+    }
     const { error } = await supabase
       .from("plan_templates")
       .update({ is_active: false, updated_at: new Date().toISOString() })
       .eq("id", id);
-
     if (error) return { success: false, error: error.message };
     return { success: true };
   } catch (error) {

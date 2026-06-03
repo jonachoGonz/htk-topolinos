@@ -209,7 +209,33 @@ export default function AdminPlansManager() {
       toast.error("No puedes eliminar el plan por defecto. Primero designa otro como default.");
       return;
     }
-    if (!confirm(`¿Eliminar (desactivar) el plan "${p.name}"?`)) return;
+
+    // Already inactive → offer hard delete (permanent).
+    if (!p.is_active) {
+      const ok = confirm(
+        `El plan "${p.name}" ya está inactivo.\n\n` +
+          `¿Eliminar PERMANENTEMENTE? Esta acción no se puede deshacer.`,
+      );
+      if (!ok) return;
+      const res = await deletePlanTemplate(p.id, { hard: true });
+      if (res.success) {
+        toast.success("Plan eliminado permanentemente");
+        fetchPlans();
+      } else {
+        const err = (res as any).error ?? "Error desconocido";
+        const isFk = /foreign key|violates|constraint/i.test(err);
+        toast.error(
+          isFk
+            ? `No se puede eliminar: hay registros asociados (asignaciones / pagos). Detalle: ${err}`
+            : `Error eliminando plan: ${err}`,
+          { duration: 8000 },
+        );
+      }
+      return;
+    }
+
+    // Active → soft delete (keep history).
+    if (!confirm(`¿Desactivar el plan "${p.name}"?\n\nQuedará oculto pero podrás reactivarlo después.`)) return;
     const res = await deletePlanTemplate(p.id);
     if (res.success) {
       toast.success("Plan desactivado");
@@ -257,73 +283,86 @@ export default function AdminPlansManager() {
         </button>
       </div>
 
-      {/* Plans table */}
-      <div className="bg-[#0f131a] border border-white/[0.06] rounded-xl overflow-hidden">
-        {loading ? (
-          <div className="px-6 py-8 text-center text-gray-500">Cargando planes...</div>
-        ) : plans.length === 0 ? (
-          <div className="px-6 py-8 text-center text-gray-500">
-            No hay planes creados aún.
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="border-b border-white/[0.06]">
-                <tr className="text-left text-xs font-inter text-gray-400 uppercase tracking-wider">
-                  <th className="px-6 py-3">Nombre</th>
-                  <th className="px-6 py-3">Clases/mes</th>
-                  <th className="px-6 py-3">Precio mensual</th>
-                  <th className="px-6 py-3">Renovación</th>
-                  <th className="px-6 py-3">Sesiones</th>
-                  <th className="px-6 py-3">Descuentos</th>
-                  <th className="px-6 py-3">Web</th>
-                  <th className="px-6 py-3">Orden</th>
-                  <th className="px-6 py-3">Estado</th>
-                  <th className="px-6 py-3">Acciones</th>
+      {/* Plans: responsive table on lg+, card stack on smaller screens */}
+      {loading ? (
+        <div className="bg-[#0f131a] border border-white/[0.06] rounded-xl px-6 py-12 text-center text-gray-500">
+          Cargando planes…
+        </div>
+      ) : plans.length === 0 ? (
+        <div className="bg-[#0f131a] border border-white/[0.06] rounded-xl px-6 py-12 text-center text-gray-500">
+          No hay planes creados aún.
+        </div>
+      ) : (
+        <>
+          {/* DESKTOP TABLE (lg+) — compact, icon-only actions */}
+          <div className="hidden lg:block bg-[#0f131a] border border-white/[0.06] rounded-xl overflow-hidden">
+            <table className="w-full text-sm table-fixed">
+              <colgroup>
+                <col className="w-[24%]" />{/* Nombre */}
+                <col className="w-[8%]" />{/* Clases */}
+                <col className="w-[14%]" />{/* Precio */}
+                <col className="w-[14%]" />{/* Sesiones */}
+                <col className="w-[7%]" />{/* Web */}
+                <col className="w-[10%]" />{/* Orden */}
+                <col className="w-[9%]" />{/* Estado */}
+                <col className="w-[14%]" />{/* Acciones */}
+              </colgroup>
+              <thead className="border-b border-white/[0.06] bg-white/[0.02]">
+                <tr className="text-left text-[10px] font-inter text-gray-500 uppercase tracking-[0.14em]">
+                  <th className="px-3 py-3">Nombre</th>
+                  <th className="px-3 py-3 text-center">Clases</th>
+                  <th className="px-3 py-3">Precio/mes</th>
+                  <th className="px-3 py-3">Sesiones</th>
+                  <th className="px-3 py-3 text-center">Web</th>
+                  <th className="px-3 py-3 text-center">Orden</th>
+                  <th className="px-3 py-3 text-center">Estado</th>
+                  <th className="px-3 py-3 text-right">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/[0.04]">
                 {plans.map((p) => (
                   <tr key={p.id} className="hover:bg-white/[0.02] transition text-white">
-                    <td className="px-6 py-3 font-medium">
-                      <div className="flex items-center gap-2">
+                    {/* Nombre + renewals chips inline below */}
+                    <td className="px-3 py-3">
+                      <div className="flex items-center gap-2 mb-1">
                         {p.is_default && (
-                          <span title="Plan por defecto">
-                            <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
+                          <span title="Plan por defecto" className="flex-shrink-0">
+                            <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />
                           </span>
                         )}
-                        {p.name}
+                        <span className="font-semibold truncate">{p.name}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {(p.allowed_renewals || []).map((r) => (
+                          <span
+                            key={r}
+                            className="px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wider bg-white/5 border border-white/10 text-gray-400"
+                          >
+                            {r}
+                          </span>
+                        ))}
+                        {p.accepts_discount_codes && (
+                          <span
+                            className="px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wider bg-emerald-500/10 border border-emerald-500/20 text-emerald-400"
+                            title={p.discount_code ? `Código: ${p.discount_code}` : "Acepta descuentos"}
+                          >
+                            {p.discount_code || "Desc."}
+                          </span>
+                        )}
                       </div>
                     </td>
-                    <td className="px-6 py-3 text-gray-400">{p.monthly_classes}</td>
-                    <td className="px-6 py-3 text-gray-400">
-                      {p.prices?.monthly?.toLocaleString("es-CL") ?? 0} CLP
+                    <td className="px-3 py-3 text-center text-gray-300 font-mono text-sm">
+                      {p.monthly_classes}
                     </td>
-                    <td className="px-6 py-3 text-gray-400">
-                      {(p.allowed_renewals || []).map((r) => (
-                        <span
-                          key={r}
-                          className="inline-block mr-1 px-1.5 py-0.5 rounded text-[10px] bg-white/5 border border-white/10"
-                        >
-                          {r}
-                        </span>
-                      ))}
+                    <td className="px-3 py-3 text-gray-300 font-mono text-xs whitespace-nowrap">
+                      ${p.prices?.monthly?.toLocaleString("es-CL") ?? 0}
                     </td>
-                    <td className="px-6 py-3 text-gray-400">
+                    <td className="px-3 py-3 text-gray-400 text-xs">
                       {p.includes_sessions
-                        ? `${p.session_count_monthly} ${p.session_type}`
+                        ? `${p.session_count_monthly}× ${p.session_type}`
                         : "—"}
                     </td>
-                    <td className="px-6 py-3 text-gray-400">
-                      {p.accepts_discount_codes ? (
-                        <span className="text-emerald-400 text-xs">
-                          {p.discount_code || "Sí"}
-                        </span>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                    <td className="px-6 py-3">
+                    <td className="px-3 py-3 text-center">
                       <button
                         onClick={() => toggleVisibility(p)}
                         title={p.show_on_landing ? "Ocultar de la web" : "Mostrar en la web"}
@@ -336,22 +375,30 @@ export default function AdminPlansManager() {
                         {p.show_on_landing ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
                       </button>
                     </td>
-                    <td className="px-6 py-3">
-                      <div className="flex items-center gap-1">
-                        <button onClick={() => reorder(p, "up")}
-                          className="p-1 rounded hover:bg-white/10 text-gray-400">
+                    <td className="px-3 py-3">
+                      <div className="flex items-center justify-center gap-0.5">
+                        <button
+                          onClick={() => reorder(p, "up")}
+                          title="Subir"
+                          className="p-1 rounded hover:bg-white/10 text-gray-400"
+                        >
                           <ArrowUp className="w-3.5 h-3.5" />
                         </button>
-                        <span className="text-xs text-gray-400 w-6 text-center">{p.display_order ?? 100}</span>
-                        <button onClick={() => reorder(p, "down")}
-                          className="p-1 rounded hover:bg-white/10 text-gray-400">
+                        <span className="text-xs text-gray-400 w-5 text-center font-mono">
+                          {p.display_order ?? 100}
+                        </span>
+                        <button
+                          onClick={() => reorder(p, "down")}
+                          title="Bajar"
+                          className="p-1 rounded hover:bg-white/10 text-gray-400"
+                        >
                           <ArrowDown className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </td>
-                    <td className="px-6 py-3">
+                    <td className="px-3 py-3 text-center">
                       <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase ${
+                        className={`inline-block px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider ${
                           p.is_active
                             ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
                             : "bg-zinc-500/10 text-zinc-400 border border-zinc-500/20"
@@ -360,12 +407,12 @@ export default function AdminPlansManager() {
                         {p.is_active ? "Activo" : "Inactivo"}
                       </span>
                     </td>
-                    <td className="px-6 py-3">
-                      <div className="flex items-center gap-1.5">
+                    <td className="px-3 py-3">
+                      <div className="flex items-center justify-end gap-0.5">
                         {!p.is_default && p.is_active && (
                           <button
                             onClick={() => handleSetDefault(p)}
-                            className="flex items-center gap-1 px-2 py-1 text-yellow-400 hover:bg-yellow-500/10 rounded transition text-xs"
+                            className="p-1.5 rounded text-yellow-400 hover:bg-yellow-500/10 transition"
                             title="Marcar como plan por defecto"
                           >
                             <Star className="w-3.5 h-3.5" />
@@ -373,17 +420,17 @@ export default function AdminPlansManager() {
                         )}
                         <button
                           onClick={() => openEdit(p)}
-                          className="flex items-center gap-1 px-2 py-1 text-blue-400 hover:bg-blue-500/10 rounded transition text-xs"
+                          className="p-1.5 rounded text-blue-400 hover:bg-blue-500/10 transition"
+                          title="Editar"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
-                          Editar
                         </button>
                         <button
                           onClick={() => handleDelete(p)}
-                          className="flex items-center gap-1 px-2 py-1 text-red-400 hover:bg-red-500/10 rounded transition text-xs"
+                          className="p-1.5 rounded text-red-400 hover:bg-red-500/10 transition"
+                          title={p.is_active ? "Desactivar" : "Eliminar permanentemente"}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
-                          Eliminar
                         </button>
                       </div>
                     </td>
@@ -392,8 +439,134 @@ export default function AdminPlansManager() {
               </tbody>
             </table>
           </div>
-        )}
-      </div>
+
+          {/* MOBILE / TABLET CARDS (< lg) */}
+          <div className="lg:hidden grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {plans.map((p) => (
+              <article
+                key={p.id}
+                className={`
+                  relative bg-[#0f131a] border rounded-2xl p-4
+                  ${p.is_active ? "border-white/[0.06]" : "border-zinc-500/20 opacity-75"}
+                `}
+              >
+                {/* Header */}
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      {p.is_default && (
+                        <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400 flex-shrink-0" />
+                      )}
+                      <h3 className="font-bold text-white truncate">{p.name}</h3>
+                    </div>
+                    <p className="text-xs text-gray-400">
+                      {p.monthly_classes} clases/mes ·{" "}
+                      <span className="text-gray-200 font-mono">
+                        ${p.prices?.monthly?.toLocaleString("es-CL") ?? 0}
+                      </span>
+                    </p>
+                  </div>
+                  <span
+                    className={`flex-shrink-0 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider ${
+                      p.is_active
+                        ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                        : "bg-zinc-500/10 text-zinc-400 border border-zinc-500/20"
+                    }`}
+                  >
+                    {p.is_active ? "Activo" : "Inactivo"}
+                  </span>
+                </div>
+
+                {/* Meta chips */}
+                <div className="flex flex-wrap gap-1 mb-3">
+                  {(p.allowed_renewals || []).map((r) => (
+                    <span
+                      key={r}
+                      className="px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wider bg-white/5 border border-white/10 text-gray-400"
+                    >
+                      {r}
+                    </span>
+                  ))}
+                  {p.includes_sessions && (
+                    <span className="px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wider bg-cyan-500/10 border border-cyan-500/20 text-cyan-300">
+                      {p.session_count_monthly}× {p.session_type}
+                    </span>
+                  )}
+                  {p.accepts_discount_codes && (
+                    <span
+                      className="px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wider bg-emerald-500/10 border border-emerald-500/20 text-emerald-400"
+                      title={p.discount_code ? `Código: ${p.discount_code}` : "Acepta descuentos"}
+                    >
+                      {p.discount_code || "Desc."}
+                    </span>
+                  )}
+                </div>
+
+                {/* Action row */}
+                <div className="flex items-center justify-between border-t border-white/[0.06] pt-3">
+                  {/* Left: visibility + order */}
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => toggleVisibility(p)}
+                      title={p.show_on_landing ? "Ocultar de la web" : "Mostrar en la web"}
+                      className={`p-2 rounded-lg transition ${
+                        p.show_on_landing
+                          ? "bg-emerald-500/10 text-emerald-400"
+                          : "bg-zinc-500/10 text-zinc-500"
+                      }`}
+                    >
+                      {p.show_on_landing ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                    </button>
+                    <button
+                      onClick={() => reorder(p, "up")}
+                      title="Subir orden"
+                      className="p-2 rounded-lg hover:bg-white/5 text-gray-400"
+                    >
+                      <ArrowUp className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="text-xs text-gray-400 font-mono w-6 text-center">
+                      {p.display_order ?? 100}
+                    </span>
+                    <button
+                      onClick={() => reorder(p, "down")}
+                      title="Bajar orden"
+                      className="p-2 rounded-lg hover:bg-white/5 text-gray-400"
+                    >
+                      <ArrowDown className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  {/* Right: edit/delete/default */}
+                  <div className="flex items-center gap-1">
+                    {!p.is_default && p.is_active && (
+                      <button
+                        onClick={() => handleSetDefault(p)}
+                        className="p-2 rounded-lg text-yellow-400 hover:bg-yellow-500/10"
+                        title="Marcar como default"
+                      >
+                        <Star className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => openEdit(p)}
+                      className="px-3 py-2 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 text-xs font-semibold flex items-center gap-1.5"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" /> Editar
+                    </button>
+                    <button
+                      onClick={() => handleDelete(p)}
+                      className="p-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                      title={p.is_active ? "Desactivar" : "Eliminar permanentemente"}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        </>
+      )}
 
       {/* Form Modal */}
       {showForm && (
