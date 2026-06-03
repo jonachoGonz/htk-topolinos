@@ -94,20 +94,20 @@ export default function Sidebar({
 
   return (
     <>
-      {/* Mobile backdrop */}
+      {/* Mobile backdrop — z above BottomNav so the nav is dimmed too */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/60 z-20 lg:hidden"
+          className="fixed inset-0 bg-black/60 z-40 lg:hidden"
           onClick={onClose}
         />
       )}
 
       <aside
         className={`
-          fixed top-0 left-0 h-screen w-56 z-30 flex flex-col
+          fixed top-0 left-0 h-screen w-60 z-50 flex flex-col
           bg-[#05050A] border-r border-white/[0.06]
           transition-transform duration-200 ease-in-out
-          lg:relative lg:translate-x-0 lg:flex-shrink-0
+          lg:relative lg:w-56 lg:translate-x-0 lg:flex-shrink-0 lg:z-30
           ${isOpen ? "translate-x-0" : "-translate-x-full"}
         `}
       >
@@ -171,8 +171,8 @@ export default function Sidebar({
           </div>
         </nav>
 
-        {/* Bottom — user + logout */}
-        <div className="px-4 pb-5 pt-3 border-t border-white/[0.06] space-y-2">
+        {/* Bottom — user + logout. Extra pb on mobile for iOS safe-area. */}
+        <div className="px-4 pt-3 border-t border-white/[0.06] space-y-2 pb-[calc(1.25rem+env(safe-area-inset-bottom))] lg:pb-5">
           {/* User identity chip */}
           <div className="flex items-center gap-2.5 px-2 py-2 rounded-lg bg-white/[0.03]">
             <div className="w-8 h-8 rounded-full bg-cyan-400/15 border border-cyan-400/30 text-cyan-300 text-xs font-bold flex items-center justify-center flex-shrink-0">
