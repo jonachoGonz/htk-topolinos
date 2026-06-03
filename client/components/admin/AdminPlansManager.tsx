@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Plus, Edit2, Trash2, Star, X, Save, DollarSign, Eye, EyeOff, ArrowUp, ArrowDown, Sparkles } from "lucide-react";
+import { Plus, Edit2, Trash2, Star, X, Save, DollarSign, Eye, EyeOff, ArrowUp, ArrowDown, Sparkles, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   getPlanTemplates,
   createPlanTemplate,
@@ -47,6 +48,7 @@ const emptyPlan = (): Omit<PlanTemplate, "id" | "created_at" | "updated_at"> => 
 });
 
 export default function AdminPlansManager() {
+  const { isAdmin } = useAuth();
   const [plans, setPlans] = useState<PlanTemplate[]>([]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -167,7 +169,17 @@ export default function AdminPlansManager() {
       closeForm();
       fetchPlans();
     } else {
-      toast.error(`Error: ${(res as any).error}`);
+      const err = (res as any).error ?? "Error desconocido";
+      // Surface RLS rejections clearly — they are the #1 reason an edit
+      // appears to silently fail.
+      const isRls = /policy|row.?level|permission|denied/i.test(err);
+      console.error("[AdminPlansManager] save failed:", err);
+      toast.error(
+        isRls
+          ? `Sin permisos para guardar (RLS). Tu cuenta debe tener is_admin=true. Detalle: ${err}`
+          : `Error guardando plan: ${err}`,
+        { duration: 8000 },
+      );
     }
   };
 
@@ -198,6 +210,16 @@ export default function AdminPlansManager() {
 
   return (
     <div className="space-y-6">
+      {!isAdmin && (
+        <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200">
+          <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+          <div className="text-sm leading-relaxed">
+            <strong>Modo solo-lectura.</strong> Tu cuenta no tiene{" "}
+            <code className="text-xs">is_admin=true</code>. Las operaciones de
+            crear/editar/eliminar serán rechazadas por la RLS de Supabase.
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-white font-montserrat">Gestión de Planes</h2>
