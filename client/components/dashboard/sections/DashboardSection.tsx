@@ -3,6 +3,7 @@ import {
   CalendarClock, Users, AlertTriangle, Clock,
   CheckCircle2, Loader2,
 } from "lucide-react";
+import { SkeletonStat } from "@/components/dashboard/Skeleton";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   getTodayOverview, supabase,
@@ -104,12 +105,14 @@ export default function DashboardSection() {
       </div>
 
       {loading ? (
-        <div className="py-12 flex items-center justify-center text-gray-500">
-          <Loader2 className="w-5 h-5 animate-spin mr-2" /> Cargando…
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <SkeletonStat key={i} />
+          ))}
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
             <StatCard label="Clases hoy" value={overview?.today_count ?? 0}
               icon={<CalendarClock className="w-5 h-5" />} color="cyan"
               hint={overview?.today_count ? "Confirmadas" : "Sin clases agendadas hoy"} />

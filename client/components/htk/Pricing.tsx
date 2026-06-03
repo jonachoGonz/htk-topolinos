@@ -44,13 +44,11 @@ export default function Pricing() {
       <div className="max-w-6xl mx-auto px-4 sm:px-5">
         {/* Header */}
         <div className="text-center mb-10 sm:mb-16">
-          <p className="text-xs uppercase font-semibold text-cyan-400 tracking-widest mb-3 sm:mb-4">
-            Planes y Tarifas
-          </p>
-          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-3 sm:mb-4">
-            ELIGE TU <span className="text-cyan-400">PLAN</span>
+          <span className="htk-chip mb-5 inline-flex">+ Planes y tarifas</span>
+          <h2 className="htk-h2 text-white mt-4 mb-4">
+            Elige tu <span className="text-cyan-400">plan</span>
           </h2>
-          <p className="text-sm sm:text-base lg:text-lg text-gray-400 max-w-2xl mx-auto px-2">
+          <p className="htk-body max-w-2xl mx-auto px-2">
             Desde entrenamientos básicos hasta acompañamiento de élite. Encuentra
             el plan perfecto para ti o para tu equipo.
           </p>

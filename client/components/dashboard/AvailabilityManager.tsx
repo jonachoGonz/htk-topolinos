@@ -276,97 +276,109 @@ export default function AvailabilityManager({
             Sin disponibilidades creadas. ¡Crea una para empezar!
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="border-b border-white/[0.06]">
-                <tr className="text-left text-xs font-inter text-gray-400 uppercase tracking-wider">
-                  <th className="px-6 py-3">Día</th>
-                  <th className="px-6 py-3">Inicio</th>
-                  <th className="px-6 py-3">Fin</th>
-                  <th className="px-6 py-3">Tipo</th>
-                  <th className="px-6 py-3">Capacidad</th>
-                  <th className="px-6 py-3">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/[0.04]">
-                {availabilities.map((av) => {
-                  const isToday = av.day_of_week === dbToday;
-                  const typeLabel =
-                    av.professional_type === "nutritionist"
-                      ? "Nutrición"
-                      : av.professional_type === "therapist"
-                      ? "Terapia"
-                      : "Kinesiología";
-                  return (
-                  <tr
-                    key={av.id}
-                    className={`hover:bg-white/[0.02] transition text-white ${
-                      isToday ? "bg-[#00d4ff]/[0.04]" : ""
-                    }`}
-                  >
-                    <td className="px-6 py-3 font-medium">
-                      {DAYS_OF_WEEK[av.day_of_week]}
-                      {isToday && (
-                        <span className="ml-2 text-[10px] uppercase tracking-wider text-[#00d4ff] font-semibold">
-                          • Hoy
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-3 text-gray-400">
-                      {av.start_time}
-                    </td>
-                    <td className="px-6 py-3 text-gray-400">{av.end_time}</td>
-                    <td className="px-6 py-3">
-                      <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase ${
-                          av.professional_type === "nutritionist"
-                            ? "bg-purple-500/10 text-purple-400 border border-purple-500/20"
-                            : av.professional_type === "therapist"
-                            ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                            : "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20"
-                        }`}
-                      >
-                        {typeLabel}
-                      </span>
-                    </td>
-                    <td className="px-6 py-3">{av.max_capacity} personas</td>
-                    <td className="px-6 py-3">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <button
-                          onClick={() =>
-                            setViewStudentsFor({
-                              avail: av,
-                              date: getNextDateForDay(av.day_of_week),
-                            })
-                          }
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-emerald-400 hover:bg-emerald-500/10 rounded transition text-sm"
-                          title="Ver alumnos inscritos"
-                        >
-                          <Users className="w-4 h-4" />
-                          Alumnos
-                        </button>
-                        <button
-                          onClick={() => setSelectedAvailability(av)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-blue-400 hover:bg-blue-500/10 rounded transition text-sm"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                          Editar
-                        </button>
-                        <button
-                          onClick={() => handleDelete(av.id)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-red-400 hover:bg-red-500/10 rounded transition text-sm"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                          Eliminar
-                        </button>
-                      </div>
-                    </td>
+          <>
+            {/* Desktop: tabla */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="border-b border-white/[0.06]">
+                  <tr className="text-left text-xs font-inter text-gray-400 uppercase tracking-wider">
+                    <th className="px-6 py-3">Día</th>
+                    <th className="px-6 py-3">Inicio</th>
+                    <th className="px-6 py-3">Fin</th>
+                    <th className="px-6 py-3">Tipo</th>
+                    <th className="px-6 py-3">Capacidad</th>
+                    <th className="px-6 py-3">Acciones</th>
                   </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-white/[0.04]">
+                  {availabilities.map((av) => {
+                    const isToday = av.day_of_week === dbToday;
+                    const typeLabel = av.professional_type === "nutritionist" ? "Nutrición" : av.professional_type === "therapist" ? "Terapia" : "Kinesiología";
+                    return (
+                      <tr key={av.id} className={`hover:bg-white/[0.02] transition text-white ${isToday ? "bg-[#00d4ff]/[0.04]" : ""}`}>
+                        <td className="px-6 py-3 font-medium">
+                          {DAYS_OF_WEEK[av.day_of_week]}
+                          {isToday && <span className="ml-2 text-[10px] uppercase tracking-wider text-[#00d4ff] font-semibold">• Hoy</span>}
+                        </td>
+                        <td className="px-6 py-3 text-gray-400">{av.start_time}</td>
+                        <td className="px-6 py-3 text-gray-400">{av.end_time}</td>
+                        <td className="px-6 py-3">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase ${av.professional_type === "nutritionist" ? "bg-purple-500/10 text-purple-400 border border-purple-500/20" : av.professional_type === "therapist" ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" : "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20"}`}>
+                            {typeLabel}
+                          </span>
+                        </td>
+                        <td className="px-6 py-3">{av.max_capacity} personas</td>
+                        <td className="px-6 py-3">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <button onClick={() => setViewStudentsFor({ avail: av, date: getNextDateForDay(av.day_of_week) })}
+                              className="flex items-center gap-1.5 px-3 py-1.5 text-emerald-400 hover:bg-emerald-500/10 rounded transition text-sm">
+                              <Users className="w-4 h-4" /> Alumnos
+                            </button>
+                            <button onClick={() => setSelectedAvailability(av)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 text-blue-400 hover:bg-blue-500/10 rounded transition text-sm">
+                              <Edit2 className="w-4 h-4" /> Editar
+                            </button>
+                            <button onClick={() => handleDelete(av.id)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 text-red-400 hover:bg-red-500/10 rounded transition text-sm">
+                              <Trash2 className="w-4 h-4" /> Eliminar
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile: cards */}
+            <div className="md:hidden divide-y divide-white/[0.04]">
+              {availabilities.map((av) => {
+                const isToday = av.day_of_week === dbToday;
+                const typeLabel = av.professional_type === "nutritionist" ? "Nutrición" : av.professional_type === "therapist" ? "Terapia" : "Kinesiología";
+                const typeClass = av.professional_type === "nutritionist" ? "bg-purple-500/10 text-purple-400 border border-purple-500/20" : av.professional_type === "therapist" ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" : "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20";
+                return (
+                  <div key={av.id} className={`p-4 space-y-3 ${isToday ? "bg-[#00d4ff]/[0.03]" : ""}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-white font-semibold text-sm">{DAYS_OF_WEEK[av.day_of_week]}</span>
+                        {isToday && <span className="text-[10px] uppercase tracking-wider text-[#00d4ff] font-semibold">• Hoy</span>}
+                      </div>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase ${typeClass}`}>{typeLabel}</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 text-xs">
+                      <div>
+                        <p className="text-gray-500 uppercase text-[10px]">Inicio</p>
+                        <p className="text-gray-300 mt-0.5">{av.start_time}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500 uppercase text-[10px]">Fin</p>
+                        <p className="text-gray-300 mt-0.5">{av.end_time}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500 uppercase text-[10px]">Capacidad</p>
+                        <p className="text-gray-300 mt-0.5">{av.max_capacity} pers.</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 pt-1">
+                      <button onClick={() => setViewStudentsFor({ avail: av, date: getNextDateForDay(av.day_of_week) })}
+                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-lg transition text-xs font-medium hover:bg-emerald-500/20">
+                        <Users className="w-3.5 h-3.5" /> Alumnos
+                      </button>
+                      <button onClick={() => setSelectedAvailability(av)}
+                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-blue-400 bg-blue-500/10 border border-blue-500/20 rounded-lg transition text-xs font-medium hover:bg-blue-500/20">
+                        <Edit2 className="w-3.5 h-3.5" /> Editar
+                      </button>
+                      <button onClick={() => handleDelete(av.id)}
+                        className="px-3 py-2 text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg transition hover:bg-red-500/20">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
 

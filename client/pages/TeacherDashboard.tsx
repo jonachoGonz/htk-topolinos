@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import Sidebar from "@/components/dashboard/Sidebar";
+import BottomNav from "@/components/dashboard/BottomNav";
 import DashboardTopBar from "@/components/dashboard/DashboardTopBar";
 import DashboardSection from "@/components/dashboard/sections/DashboardSection";
 import CalendarSection from "@/components/dashboard/sections/CalendarSection";
@@ -35,7 +36,7 @@ export default function TeacherDashboard() {
         <DashboardTopBar onMenuToggle={() => setSidebarOpen(true)} activeTab={activeTab} onTabChange={setActiveTab} />
 
         {/* Scrollable content */}
-        <main className="flex-1 overflow-y-auto bg-[#0a0e1a] p-5 lg:p-6">
+        <main className="flex-1 overflow-y-auto bg-[#0a0e1a] p-5 lg:p-6 htk-bottom-safe lg:!pb-6">
           {activeTab === "dashboard" && <DashboardSection />}
           {activeTab === "calendar" && <CalendarSection professionalId={user?.id || ""} />}
           {activeTab === "patients" && <PatientsSection professionalId={user?.id || ""} />}
@@ -45,6 +46,7 @@ export default function TeacherDashboard() {
         </main>
       </div>
 
+      <BottomNav userRole="teacher" activeTab={activeTab} onTabChange={setActiveTab} />
     </div>
   );
 }

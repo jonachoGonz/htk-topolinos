@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import Sidebar from "@/components/dashboard/Sidebar";
+import BottomNav from "@/components/dashboard/BottomNav";
 import StudentTopBar from "@/components/dashboard/StudentTopBar";
 import StudentDashboardSection from "@/components/dashboard/sections/StudentDashboardSection";
 import StudentCalendarSection from "@/components/dashboard/sections/StudentCalendarSection";
@@ -48,7 +49,7 @@ export default function StudentDashboard() {
         />
 
         {/* Scrollable content */}
-        <main className="flex-1 overflow-y-auto bg-[#0a0e1a] p-5 lg:p-6">
+        <main className="flex-1 overflow-y-auto bg-[#0a0e1a] p-5 lg:p-6 htk-bottom-safe lg:!pb-6">
           {activeTab === "dashboard" && <StudentDashboardSection />}
           {activeTab === "calendario" && <StudentCalendarSection studentId={user?.id || ""} />}
           {activeTab === "messages" && <MessagingPanel />}
@@ -56,6 +57,8 @@ export default function StudentDashboard() {
           {activeTab === "configuracion" && <StudentSettingsSection />}
         </main>
       </div>
+
+      <BottomNav userRole="student" activeTab={activeTab} onTabChange={setActiveTab} />
 
       {/* Onboarding wizard — blocks usage until profile + PAR-Q complete */}
       {needsOnboarding && user?.id && (

@@ -17,6 +17,10 @@ export default {
         lexend: ["Lexend", "sans-serif"],
         inter: ["Inter", "sans-serif"],
         montserrat: ["Montserrat", "sans-serif"],
+        display: ['"Bebas Neue"', "Anton", "Impact", "sans-serif"],
+      },
+      letterSpacing: {
+        "display-tight": "-0.02em",
       },
       colors: {
         border: "hsl(var(--border))",
