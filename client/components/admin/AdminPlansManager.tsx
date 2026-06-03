@@ -219,136 +219,145 @@ export default function AdminPlansManager() {
         {loading ? (
           <div className="px-6 py-8 text-center text-gray-500">Cargando planes...</div>
         ) : plans.length === 0 ? (
-          <div className="px-6 py-8 text-center text-gray-500">
-            No hay planes creados aún.
-          </div>
+          <div className="px-6 py-8 text-center text-gray-500">No hay planes creados aún.</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="border-b border-white/[0.06]">
-                <tr className="text-left text-xs font-inter text-gray-400 uppercase tracking-wider">
-                  <th className="px-6 py-3">Nombre</th>
-                  <th className="px-6 py-3">Clases/mes</th>
-                  <th className="px-6 py-3">Precio mensual</th>
-                  <th className="px-6 py-3">Renovación</th>
-                  <th className="px-6 py-3">Sesiones</th>
-                  <th className="px-6 py-3">Descuentos</th>
-                  <th className="px-6 py-3">Web</th>
-                  <th className="px-6 py-3">Orden</th>
-                  <th className="px-6 py-3">Estado</th>
-                  <th className="px-6 py-3">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/[0.04]">
-                {plans.map((p) => (
-                  <tr key={p.id} className="hover:bg-white/[0.02] transition text-white">
-                    <td className="px-6 py-3 font-medium">
-                      <div className="flex items-center gap-2">
-                        {p.is_default && (
-                          <span title="Plan por defecto">
-                            <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
-                          </span>
-                        )}
-                        {p.name}
-                      </div>
-                    </td>
-                    <td className="px-6 py-3 text-gray-400">{p.monthly_classes}</td>
-                    <td className="px-6 py-3 text-gray-400">
-                      {p.prices?.monthly?.toLocaleString("es-CL") ?? 0} CLP
-                    </td>
-                    <td className="px-6 py-3 text-gray-400">
-                      {(p.allowed_renewals || []).map((r) => (
-                        <span
-                          key={r}
-                          className="inline-block mr-1 px-1.5 py-0.5 rounded text-[10px] bg-white/5 border border-white/10"
-                        >
-                          {r}
-                        </span>
-                      ))}
-                    </td>
-                    <td className="px-6 py-3 text-gray-400">
-                      {p.includes_sessions
-                        ? `${p.session_count_monthly} ${p.session_type}`
-                        : "—"}
-                    </td>
-                    <td className="px-6 py-3 text-gray-400">
-                      {p.accepts_discount_codes ? (
-                        <span className="text-emerald-400 text-xs">
-                          {p.discount_code || "Sí"}
-                        </span>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                    <td className="px-6 py-3">
-                      <button
-                        onClick={() => toggleVisibility(p)}
-                        title={p.show_on_landing ? "Ocultar de la web" : "Mostrar en la web"}
-                        className={`p-1.5 rounded transition ${
-                          p.show_on_landing
-                            ? "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
-                            : "bg-zinc-500/10 text-zinc-500 hover:bg-zinc-500/20"
-                        }`}
-                      >
-                        {p.show_on_landing ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-                      </button>
-                    </td>
-                    <td className="px-6 py-3">
-                      <div className="flex items-center gap-1">
-                        <button onClick={() => reorder(p, "up")}
-                          className="p-1 rounded hover:bg-white/10 text-gray-400">
-                          <ArrowUp className="w-3.5 h-3.5" />
-                        </button>
-                        <span className="text-xs text-gray-400 w-6 text-center">{p.display_order ?? 100}</span>
-                        <button onClick={() => reorder(p, "down")}
-                          className="p-1 rounded hover:bg-white/10 text-gray-400">
-                          <ArrowDown className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                    <td className="px-6 py-3">
-                      <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase ${
-                          p.is_active
-                            ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                            : "bg-zinc-500/10 text-zinc-400 border border-zinc-500/20"
-                        }`}
-                      >
-                        {p.is_active ? "Activo" : "Inactivo"}
-                      </span>
-                    </td>
-                    <td className="px-6 py-3">
-                      <div className="flex items-center gap-1.5">
-                        {!p.is_default && p.is_active && (
-                          <button
-                            onClick={() => handleSetDefault(p)}
-                            className="flex items-center gap-1 px-2 py-1 text-yellow-400 hover:bg-yellow-500/10 rounded transition text-xs"
-                            title="Marcar como plan por defecto"
-                          >
-                            <Star className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                        <button
-                          onClick={() => openEdit(p)}
-                          className="flex items-center gap-1 px-2 py-1 text-blue-400 hover:bg-blue-500/10 rounded transition text-xs"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                          Editar
-                        </button>
-                        <button
-                          onClick={() => handleDelete(p)}
-                          className="flex items-center gap-1 px-2 py-1 text-red-400 hover:bg-red-500/10 rounded transition text-xs"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          Eliminar
-                        </button>
-                      </div>
-                    </td>
+          <>
+            {/* Desktop: tabla */}
+            <div className="hidden lg:block overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="border-b border-white/[0.06]">
+                  <tr className="text-left text-xs font-inter text-gray-400 uppercase tracking-wider">
+                    <th className="px-6 py-3">Nombre</th>
+                    <th className="px-6 py-3">Clases/mes</th>
+                    <th className="px-6 py-3">Precio mensual</th>
+                    <th className="px-6 py-3">Renovación</th>
+                    <th className="px-6 py-3">Sesiones</th>
+                    <th className="px-6 py-3">Descuentos</th>
+                    <th className="px-6 py-3">Web</th>
+                    <th className="px-6 py-3">Orden</th>
+                    <th className="px-6 py-3">Estado</th>
+                    <th className="px-6 py-3">Acciones</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-white/[0.04]">
+                  {plans.map((p) => (
+                    <tr key={p.id} className="hover:bg-white/[0.02] transition text-white">
+                      <td className="px-6 py-3 font-medium">
+                        <div className="flex items-center gap-2">
+                          {p.is_default && <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" title="Plan por defecto" />}
+                          {p.name}
+                        </div>
+                      </td>
+                      <td className="px-6 py-3 text-gray-400">{p.monthly_classes}</td>
+                      <td className="px-6 py-3 text-gray-400">{p.prices?.monthly?.toLocaleString("es-CL") ?? 0} CLP</td>
+                      <td className="px-6 py-3 text-gray-400">
+                        {(p.allowed_renewals || []).map((r) => (
+                          <span key={r} className="inline-block mr-1 px-1.5 py-0.5 rounded text-[10px] bg-white/5 border border-white/10">{r}</span>
+                        ))}
+                      </td>
+                      <td className="px-6 py-3 text-gray-400">{p.includes_sessions ? `${p.session_count_monthly} ${p.session_type}` : "—"}</td>
+                      <td className="px-6 py-3 text-gray-400">
+                        {p.accepts_discount_codes ? <span className="text-emerald-400 text-xs">{p.discount_code || "Sí"}</span> : "—"}
+                      </td>
+                      <td className="px-6 py-3">
+                        <button onClick={() => toggleVisibility(p)} title={p.show_on_landing ? "Ocultar de la web" : "Mostrar en la web"}
+                          className={`p-1.5 rounded transition ${p.show_on_landing ? "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20" : "bg-zinc-500/10 text-zinc-500 hover:bg-zinc-500/20"}`}>
+                          {p.show_on_landing ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                        </button>
+                      </td>
+                      <td className="px-6 py-3">
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => reorder(p, "up")} className="p-1 rounded hover:bg-white/10 text-gray-400"><ArrowUp className="w-3.5 h-3.5" /></button>
+                          <span className="text-xs text-gray-400 w-6 text-center">{p.display_order ?? 100}</span>
+                          <button onClick={() => reorder(p, "down")} className="p-1 rounded hover:bg-white/10 text-gray-400"><ArrowDown className="w-3.5 h-3.5" /></button>
+                        </div>
+                      </td>
+                      <td className="px-6 py-3">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase ${p.is_active ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-zinc-500/10 text-zinc-400 border border-zinc-500/20"}`}>
+                          {p.is_active ? "Activo" : "Inactivo"}
+                        </span>
+                      </td>
+                      <td className="px-6 py-3">
+                        <div className="flex items-center gap-1.5">
+                          {!p.is_default && p.is_active && (
+                            <button onClick={() => handleSetDefault(p)} title="Plan por defecto"
+                              className="flex items-center gap-1 px-2 py-1 text-yellow-400 hover:bg-yellow-500/10 rounded transition text-xs">
+                              <Star className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          <button onClick={() => openEdit(p)} className="flex items-center gap-1 px-2 py-1 text-blue-400 hover:bg-blue-500/10 rounded transition text-xs">
+                            <Edit2 className="w-3.5 h-3.5" /> Editar
+                          </button>
+                          <button onClick={() => handleDelete(p)} className="flex items-center gap-1 px-2 py-1 text-red-400 hover:bg-red-500/10 rounded transition text-xs">
+                            <Trash2 className="w-3.5 h-3.5" /> Eliminar
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile/Tablet: cards */}
+            <div className="lg:hidden divide-y divide-white/[0.04]">
+              {plans.map((p) => (
+                <div key={p.id} className="p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      {p.is_default && <Star className="w-4 h-4 text-yellow-400 fill-yellow-400 flex-shrink-0" />}
+                      <span className="text-white font-semibold text-sm truncate">{p.name}</span>
+                      {p.highlight && <Sparkles className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />}
+                    </div>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase flex-shrink-0 ${p.is_active ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-zinc-500/10 text-zinc-400 border border-zinc-500/20"}`}>
+                      {p.is_active ? "Activo" : "Inactivo"}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div>
+                      <p className="text-gray-500 uppercase text-[10px]">Precio/mes</p>
+                      <p className="text-white mt-0.5 font-semibold">{(p.prices?.monthly ?? 0).toLocaleString("es-CL")} CLP</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500 uppercase text-[10px]">Clases/mes</p>
+                      <p className="text-gray-300 mt-0.5">{p.monthly_classes}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500 uppercase text-[10px]">Renovación</p>
+                      <p className="text-gray-300 mt-0.5">{(p.allowed_renewals || []).join(", ")}</p>
+                    </div>
+                  </div>
+
+                  {p.includes_sessions && (
+                    <p className="text-xs text-cyan-400">{p.session_count_monthly} sesiones de {p.session_type}</p>
+                  )}
+
+                  <div className="flex items-center gap-2 pt-1 flex-wrap">
+                    <button onClick={() => toggleVisibility(p)}
+                      className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition ${p.show_on_landing ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-zinc-500/10 text-zinc-400 border border-zinc-500/20"}`}>
+                      {p.show_on_landing ? <><Eye className="w-3 h-3" /> Web</> : <><EyeOff className="w-3 h-3" /> Oculto</>}
+                    </button>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => reorder(p, "up")} className="p-1.5 rounded-lg hover:bg-white/10 text-gray-400 border border-white/10"><ArrowUp className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => reorder(p, "down")} className="p-1.5 rounded-lg hover:bg-white/10 text-gray-400 border border-white/10"><ArrowDown className="w-3.5 h-3.5" /></button>
+                    </div>
+                    {!p.is_default && p.is_active && (
+                      <button onClick={() => handleSetDefault(p)} className="p-1.5 rounded-lg bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 hover:bg-yellow-500/20 transition" title="Marcar como default">
+                        <Star className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    <button onClick={() => openEdit(p)} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 transition text-xs font-medium">
+                      <Edit2 className="w-3 h-3" /> Editar
+                    </button>
+                    <button onClick={() => handleDelete(p)} className="p-1.5 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
 

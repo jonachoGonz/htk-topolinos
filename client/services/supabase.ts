@@ -538,13 +538,17 @@ export async function updateProfile(
   }>
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("profiles")
       .update(updates)
-      .eq("id", userId);
+      .eq("id", userId)
+      .select("id");
 
     if (error) {
       return { success: false, error: error.message };
+    }
+    if (!data || data.length === 0) {
+      return { success: false, error: "Sin permisos para actualizar el perfil. Recarga la sesión." };
     }
 
     return { success: true };
@@ -1533,10 +1537,11 @@ export async function updateTeacherProfile(
   id: string, patch: Partial<TeacherProfile>
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const row: any = { ...patch, updated_at: new Date().toISOString() };
-    delete row.id; delete row.role; delete row.is_admin;
-    const { error } = await supabase.from("profiles").update(row).eq("id", id);
+    const row: any = { ...patch };
+    delete row.id; delete row.role; delete row.is_admin; delete row.updated_at;
+    const { data, error } = await supabase.from("profiles").update(row).eq("id", id).select("id");
     if (error) return { success: false, error: error.message };
+    if (!data || data.length === 0) return { success: false, error: "Sin permisos para actualizar este perfil. Recarga la sesión." };
     return { success: true };
   } catch (e) { return { success: false, error: String(e) }; }
 }
@@ -1700,13 +1705,15 @@ export async function updatePatient(
   updates: Partial<PatientProfile>
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const row: any = { ...updates, updated_at: new Date().toISOString() };
-    // Strip read-only fields
+    const row: any = { ...updates };
+    // Strip read-only / non-updatable fields
     delete row.id;
     delete row.role;
     delete row.is_admin;
-    const { error } = await supabase.from("profiles").update(row).eq("id", id);
+    delete row.updated_at;
+    const { data, error } = await supabase.from("profiles").update(row).eq("id", id).select("id");
     if (error) return { success: false, error: error.message };
+    if (!data || data.length === 0) return { success: false, error: "Sin permisos para actualizar el perfil. Recarga la sesión." };
     return { success: true };
   } catch (error) {
     return { success: false, error: String(error) };

@@ -9,8 +9,8 @@ const stats = [
 
 const facilities = [
   {
-    title: "Zona de Patienta",
-    image: "https://placehold.co/600x400/3a2a1a/3a2a1a?text=Zona+de+Patienta",
+    title: "Zona de Pesas",
+    image: "https://placehold.co/600x400/1a2a3a/1a2a3a?text=Zona+de+Pesas",
   },
   {
     title: "Área Kinésica",

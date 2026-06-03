@@ -89,38 +89,63 @@ export default function StudentPaymentSection({ studentId }: StudentPaymentSecti
             Sin planes registrados
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="border-b border-white/[0.06]">
-                <tr className="text-left text-xs font-inter text-gray-400 uppercase tracking-wider">
-                  <th className="px-6 py-3">Nombre del Plan</th>
-                  <th className="px-6 py-3">Sesiones</th>
-                  <th className="px-6 py-3">Restantes</th>
-                  <th className="px-6 py-3">Vencimiento</th>
-                  <th className="px-6 py-3">Estado</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/[0.04]">
-                {plans.map((plan) => (
-                  <tr key={plan.id} className="hover:bg-white/[0.02] transition text-white">
-                    <td className="px-6 py-3 font-medium">{plan.name}</td>
-                    <td className="px-6 py-3">{plan.total_sessions}</td>
-                    <td className="px-6 py-3">
-                      <span className="font-semibold text-[#00d4ff]">
-                        {plan.remaining_sessions}
-                      </span>
-                    </td>
-                    <td className="px-6 py-3 text-gray-400">
-                      {new Date(plan.expiry_date).toLocaleDateString("es-CL")}
-                    </td>
-                    <td className="px-6 py-3">
-                      {getStatusBadge(plan)}
-                    </td>
+          <>
+            {/* Desktop: tabla */}
+            <div className="hidden sm:block overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="border-b border-white/[0.06]">
+                  <tr className="text-left text-xs font-inter text-gray-400 uppercase tracking-wider">
+                    <th className="px-6 py-3">Nombre del Plan</th>
+                    <th className="px-6 py-3">Sesiones</th>
+                    <th className="px-6 py-3">Restantes</th>
+                    <th className="px-6 py-3">Vencimiento</th>
+                    <th className="px-6 py-3">Estado</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-white/[0.04]">
+                  {plans.map((plan) => (
+                    <tr key={plan.id} className="hover:bg-white/[0.02] transition text-white">
+                      <td className="px-6 py-3 font-medium">{plan.name}</td>
+                      <td className="px-6 py-3">{plan.total_sessions}</td>
+                      <td className="px-6 py-3">
+                        <span className="font-semibold text-[#00d4ff]">{plan.remaining_sessions}</span>
+                      </td>
+                      <td className="px-6 py-3 text-gray-400">
+                        {new Date(plan.expiry_date).toLocaleDateString("es-CL")}
+                      </td>
+                      <td className="px-6 py-3">{getStatusBadge(plan)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile: cards */}
+            <div className="sm:hidden divide-y divide-white/[0.04]">
+              {plans.map((plan) => (
+                <div key={plan.id} className="p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-white font-semibold text-sm">{plan.name}</p>
+                    {getStatusBadge(plan)}
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div>
+                      <p className="text-gray-500 uppercase text-[10px]">Total</p>
+                      <p className="text-gray-300 mt-0.5">{plan.total_sessions}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500 uppercase text-[10px]">Restantes</p>
+                      <p className="text-[#00d4ff] font-semibold mt-0.5">{plan.remaining_sessions}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500 uppercase text-[10px]">Vence</p>
+                      <p className="text-gray-300 mt-0.5">{new Date(plan.expiry_date).toLocaleDateString("es-CL")}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
       )}
