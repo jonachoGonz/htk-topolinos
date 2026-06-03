@@ -1,4 +1,4 @@
-import { Star, Users, Dumbbell, Trophy, Clock, ChevronDown } from "lucide-react";
+import { Star, Users, Dumbbell, Trophy, Clock, ChevronDown, ArrowRight } from "lucide-react";
 
 const stats = [
   { icon: Users, value: "500+", label: "Atletas entrenados" },
@@ -7,73 +7,97 @@ const stats = [
   { icon: Clock, value: "24/7", label: "Atención continua" },
 ];
 
+// Editorial-grade Unsplash photos (replaceable with real shots later).
+const HERO_BG =
+  "https://images.unsplash.com/photo-1599058917212-d750089bc07e?auto=format&fit=crop&w=1920&q=80";
+
 export default function Hero() {
   return (
-    <section className="w-full relative overflow-hidden bg-gradient-to-b from-[#0a0e1a] via-[#0c1020] to-[#0f1420] py-16 sm:py-24 lg:py-36">
-      {/* Glow background effect */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-cyan-400/5 rounded-full blur-3xl" />
-        <div className="absolute top-1/2 left-1/4 w-[300px] h-[300px] bg-cyan-600/4 rounded-full blur-3xl" />
+    <section
+      id="home"
+      className="relative w-full overflow-hidden bg-[#0a0e1a]"
+    >
+      {/* Background image */}
+      <div className="absolute inset-0">
+        <img
+          src={HERO_BG}
+          alt=""
+          aria-hidden="true"
+          className="w-full h-full object-cover object-center opacity-55"
+          loading="eager"
+          fetchPriority="high"
+        />
+        {/* Vignette + tint */}
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0a0e1a]/70 via-[#0a0e1a]/55 to-[#0a0e1a]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(10,14,26,0.65)_75%)]" />
       </div>
 
-      <div className="relative max-w-6xl mx-auto px-4 sm:px-6">
-        {/* Badge */}
-        <div className="flex justify-center mb-8">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-cyan-400/10 border border-cyan-400/20 rounded-full">
-            <Star className="w-3.5 h-3.5 text-cyan-400" fill="currentColor" />
-            <span className="text-xs uppercase font-semibold text-cyan-400 tracking-wider">
-              Centro de Alto Rendimiento
-            </span>
-          </div>
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 pt-20 sm:pt-28 lg:pt-36 pb-16 sm:pb-24">
+        {/* Eyebrow chip */}
+        <div className="flex justify-start mb-7">
+          <span className="htk-chip htk-chip-accent">
+            <Star className="w-3 h-3" fill="currentColor" />
+            Centro de Alto Rendimiento
+          </span>
         </div>
 
-        {/* Main Heading */}
-        <div className="text-center mb-10 sm:mb-14">
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-[1.1] tracking-tight mb-5 sm:mb-6">
-            <span className="text-white">Rendimiento </span>
-            <span className="text-cyan-400">físico</span>
-            <span className="text-white"> de</span>
+        {/* Display heading — magazine block */}
+        <div className="max-w-5xl">
+          <h1 className="htk-display text-[14vw] sm:text-[10vw] lg:text-[8.5rem] xl:text-[10rem] text-white leading-[0.85]">
+            Rendimiento
             <br />
-            <span className="text-white">élite con </span>
-            <span className="text-cyan-400">ciencia clínica</span>
+            <span className="text-cyan-400">de élite,</span>
+            <br />
+            ciencia clínica.
           </h1>
+        </div>
 
-          <p className="text-base sm:text-lg lg:text-xl text-gray-400 max-w-2xl mx-auto mb-8 sm:mb-10 leading-relaxed px-2">
+        {/* Subhead + actions */}
+        <div className="mt-8 sm:mt-10 grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-6 lg:gap-12 items-end">
+          <p className="htk-body max-w-xl">
             Kinesiología especializada, nutrición y entrenamiento integrado para
             deportistas y equipos que buscan maximizar su potencial.
           </p>
-
-          {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
+          <div className="flex flex-wrap items-center gap-3">
             <a
               href="/login"
-              className="w-full sm:w-auto px-7 py-3.5 bg-cyan-400 text-[#0a0e1a] font-bold rounded-xl hover:bg-cyan-300 active:scale-95 transition-all text-sm sm:text-base text-center shadow-lg shadow-cyan-400/20"
+              className="
+                group inline-flex items-center gap-2 px-6 py-3.5
+                bg-cyan-400 text-[#0a0e1a] font-bold text-sm rounded-full
+                hover:bg-cyan-300 active:scale-[0.98] transition-all
+                shadow-[0_8px_24px_-8px_rgba(0,212,255,0.6)]
+              "
             >
-              Agendar Clase de Prueba
+              Agendar clase de prueba
+              <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
             </a>
             <a
               href="#servicios"
-              className="w-full sm:w-auto px-7 py-3.5 bg-white/5 text-white border border-white/10 rounded-xl hover:bg-white/10 transition text-sm sm:text-base text-center"
+              className="
+                inline-flex items-center gap-2 px-6 py-3.5
+                bg-white/[0.06] backdrop-blur-sm text-white border border-white/15
+                font-medium text-sm rounded-full hover:bg-white/[0.1] transition
+              "
             >
-              Conocer los Servicios
+              Conocer los servicios
             </a>
           </div>
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-0 border-t border-white/[0.06] pt-10 sm:pt-12 mt-6">
-          {stats.map((stat, i) => {
+        <div className="mt-14 sm:mt-20 grid grid-cols-2 md:grid-cols-4 gap-px bg-white/[0.06] border border-white/[0.08] rounded-2xl overflow-hidden backdrop-blur-sm">
+          {stats.map((stat) => {
             const Icon = stat.icon;
             return (
               <div
                 key={stat.label}
-                className={`flex flex-col items-center text-center px-4 py-2 ${
-                  i < 3 ? "sm:border-r sm:border-white/[0.06]" : ""
-                }`}
+                className="flex flex-col items-start gap-2 px-5 py-6 bg-[#0a0e1a]/80"
               >
-                <Icon className="w-5 h-5 text-cyan-400 mb-2" />
-                <p className="text-2xl sm:text-3xl font-bold text-white">{stat.value}</p>
-                <p className="text-xs text-gray-400 mt-1 uppercase tracking-wide font-medium">
+                <Icon className="w-4 h-4 text-cyan-400" />
+                <p className="htk-display text-3xl sm:text-4xl text-white">
+                  {stat.value}
+                </p>
+                <p className="text-[10px] sm:text-xs text-gray-400 uppercase tracking-[0.14em] font-medium">
                   {stat.label}
                 </p>
               </div>
@@ -82,8 +106,8 @@ export default function Hero() {
         </div>
 
         {/* Scroll hint */}
-        <div className="flex justify-center mt-10 sm:mt-14 animate-bounce">
-          <ChevronDown className="w-5 h-5 text-gray-600" />
+        <div className="hidden sm:flex justify-center mt-10 animate-bounce">
+          <ChevronDown className="w-5 h-5 text-gray-500" />
         </div>
       </div>
     </section>

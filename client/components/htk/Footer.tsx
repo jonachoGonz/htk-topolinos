@@ -36,8 +36,8 @@ export default function Footer() {
   const wa = waLink(s.whatsapp_phone || s.center_phone);
 
   return (
-    <footer className="w-full bg-[#0f1420] border-t border-[#1a1f2e] py-10 sm:py-16">
-      <div className="max-w-6xl mx-auto px-4 sm:px-5">
+    <footer className="w-full bg-[#0f1420] border-t border-[#1a1f2e] pt-10 sm:pt-16 overflow-hidden">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
         {/* Main Footer Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-10">
           {/* Logo & Description */}
@@ -148,6 +148,16 @@ export default function Footer() {
             <a href="#" className="text-xs sm:text-sm text-gray-400 hover:text-cyan-400 transition">Términos</a>
             <a href="#" className="text-xs sm:text-sm text-gray-400 hover:text-cyan-400 transition">Privacidad</a>
           </div>
+        </div>
+      </div>
+
+      {/* Giant wordmark */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none select-none mt-8 sm:mt-14 -mb-4 sm:-mb-6 px-4"
+      >
+        <div className="htk-display text-white/[0.05] text-center leading-[0.85] text-[22vw] tracking-[-0.04em]">
+          HTKCENTER
         </div>
       </div>
     </footer>
