@@ -130,14 +130,17 @@ export default function StudentDashboardSection({ onNavigate }: Props = {}) {
 
   const nextClass = upcomingConfirmed[0];
 
-  // Clases agendadas en el mes calendario actual
+  // Clases agendadas en el mes calendario actual.
+  // Excluimos nutricionista: el cupo monthly_class_count corresponde a
+  // sesiones de entrenamiento (kinesi/terapia), no controles nutri.
   const monthPrefix = todayIso.slice(0, 7);
   const bookedThisMonth = useMemo(
     () =>
       bookings.filter(
         (b) =>
           (b.status === "confirmed" || b.status === "completed") &&
-          b.booking_date.startsWith(monthPrefix),
+          b.booking_date.startsWith(monthPrefix) &&
+          b.professional_type !== "nutritionist",
       ).length,
     [bookings, monthPrefix],
   );

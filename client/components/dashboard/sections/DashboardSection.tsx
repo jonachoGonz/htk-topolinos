@@ -167,6 +167,34 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
       const sevenAgo = new Date(Date.now() - 7 * 86_400_000).toISOString();
       const in14 = new Date(Date.now() + 14 * 86_400_000).toISOString().split("T")[0];
 
+      // Admins see global scope; teachers are scoped to their own bookings.
+      const nextQ = supabase
+        .from("bookings")
+        .select("id, booking_date, start_time, end_time, student_id, attended, student:profiles!bookings_student_id_fkey(full_name)")
+        .eq("status", "confirmed")
+        .gte("booking_date", todayIso)
+        .order("booking_date", { ascending: true })
+        .order("start_time", { ascending: true })
+        .limit(8);
+      if (!isAdmin) nextQ.eq("professional_id", user.id);
+
+      const cancQ = supabase
+        .from("bookings")
+        .select("id, booking_date, start_time, cancelled_at, notes, student_id, student:profiles!bookings_student_id_fkey(full_name, phone)")
+        .eq("status", "cancelled")
+        .gte("cancelled_at", sevenAgo)
+        .order("cancelled_at", { ascending: false })
+        .limit(8);
+      if (!isAdmin) cancQ.eq("professional_id", user.id);
+
+      const heatQ = supabase
+        .from("bookings")
+        .select("booking_date, start_time")
+        .eq("status", "confirmed")
+        .gte("booking_date", todayIso)
+        .lte("booking_date", in14);
+      if (!isAdmin) heatQ.eq("professional_id", user.id);
+
       const [
         ovRes,
         nextRes,
@@ -174,30 +202,9 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
         heatRes,
       ] = await Promise.all([
         getTodayOverview(user.id),
-        supabase
-          .from("bookings")
-          .select("id, booking_date, start_time, end_time, student_id, attended, student:profiles!bookings_student_id_fkey(full_name)")
-          .eq("professional_id", user.id)
-          .eq("status", "confirmed")
-          .gte("booking_date", todayIso)
-          .order("booking_date", { ascending: true })
-          .order("start_time", { ascending: true })
-          .limit(8),
-        supabase
-          .from("bookings")
-          .select("id, booking_date, start_time, cancelled_at, notes, student_id, student:profiles!bookings_student_id_fkey(full_name, phone)")
-          .eq("professional_id", user.id)
-          .eq("status", "cancelled")
-          .gte("cancelled_at", sevenAgo)
-          .order("cancelled_at", { ascending: false })
-          .limit(8),
-        supabase
-          .from("bookings")
-          .select("booking_date, start_time")
-          .eq(isAdmin ? "status" : "professional_id", isAdmin ? "confirmed" : user.id)
-          .eq("status", "confirmed")
-          .gte("booking_date", todayIso)
-          .lte("booking_date", in14),
+        nextQ,
+        cancQ,
+        heatQ,
       ]);
 
       if (cancelledFlag) return;
