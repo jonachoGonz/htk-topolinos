@@ -111,14 +111,11 @@ CREATE POLICY "Teachers read student profiles"
   );
 
 -- ===================================================================
--- 5. Drop the old recursion-prone helper functions (no longer needed)
--- ===================================================================
-DROP FUNCTION IF EXISTS public.is_user_admin(uuid);
-DROP FUNCTION IF EXISTS public.is_user_teacher(uuid);
-
--- ===================================================================
--- 6. Re-create them as thin wrappers around auth.jwt() so any existing
---    code that calls them still works, but they don't query profiles
+-- 5. Replace the helper bodies in place (no DROP — other policies on
+--    plans, plan_templates, storage.objects, app_settings depend on
+--    them by name. CREATE OR REPLACE keeps the OID; those policies
+--    silently pick up the new auth.jwt() implementation, so they also
+--    stop querying profiles and stop being recursion-vulnerable.)
 -- ===================================================================
 CREATE OR REPLACE FUNCTION public.is_user_admin(p_user_id UUID DEFAULT auth.uid())
 RETURNS BOOLEAN
