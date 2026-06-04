@@ -22,14 +22,16 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Fallback redirect: if AuthContext picks up a session before the form
-  // submission resolves (e.g. returning user, persisted session), route them
-  // out of /login automatically.
+  // Fallback redirect for persisted sessions only — i.e. a user lands on
+  // /login while already authenticated from a previous visit. Gated on
+  // `!loading` so it can never race the role-mismatch check inside
+  // handleSubmit: while a submit is in flight, this effect stays idle and
+  // resolveAndRedirect is the only thing that may navigate.
   useEffect(() => {
-    if (!user) return;
+    if (!user || loading) return;
     if (userRole === "teacher") navigate("/dashboard", { replace: true });
     else if (userRole === "student") navigate("/dashboard/student", { replace: true });
-  }, [user, userRole, navigate]);
+  }, [user, userRole, loading, navigate]);
 
   // Resolve the user's role from the JWT's app_metadata (populated by the
   // sync trigger on profiles). Falls back to a profiles query only if the
@@ -68,6 +70,11 @@ export default function Login() {
     }
 
     if (actualRole !== expectedRole) {
+      // Sign out the just-created session so the persisted-session
+      // useEffect cannot rebound them straight to the wrong dashboard
+      // once loading flips false, and so they can re-attempt on the
+      // correct tab without a stale session lingering.
+      await supabase.auth.signOut();
       setError(
         actualRole === "teacher"
           ? "Esta cuenta es de profesional. Cambia al ingreso de Profesor."
