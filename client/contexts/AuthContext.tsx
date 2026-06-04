@@ -29,18 +29,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(newSession?.user ?? null);
 
       if (newSession?.user) {
-        // Defer DB call outside the auth lock to prevent deadlock in Supabase JS v2
-        setTimeout(async () => {
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("role, is_admin")
-            .eq("id", newSession.user.id)
-            .single();
+        // Happy path: claims from JWT app_metadata (migration 017).
+        // No DB query → cannot recurse, cannot fail on stale RLS cache.
+        const meta = (newSession.user.app_metadata ?? {}) as {
+          role?: "teacher" | "student";
+          is_admin?: boolean;
+        };
 
-          setUserRole(profile ? (profile.role as "teacher" | "student") : null);
-          setIsAdmin(!!profile?.is_admin);
+        if (meta.role) {
+          setUserRole(meta.role);
+          setIsAdmin(!!meta.is_admin);
           setLoading(false);
-        }, 0);
+        } else {
+          // Legacy fallback for sessions issued before the claims existed.
+          // Deferred to avoid Supabase auth lock deadlock.
+          setTimeout(async () => {
+            const { data: profile } = await supabase
+              .from("profiles")
+              .select("role, is_admin")
+              .eq("id", newSession.user.id)
+              .maybeSingle();
+            setUserRole(profile ? (profile.role as "teacher" | "student") : null);
+            setIsAdmin(!!profile?.is_admin);
+            setLoading(false);
+          }, 0);
+        }
       } else {
         setUserRole(null);
         setIsAdmin(false);

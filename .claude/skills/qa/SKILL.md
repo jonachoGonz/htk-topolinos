@@ -26,8 +26,9 @@ ese checklist directamente.
 /qa login               → flujo Login
 /qa planes              → flujo CRUD de planes
 /qa usuarios            → flujo CRUD de usuarios/perfiles
-/qa booking             → flujo de disponibilidad y reservas
-/qa all                 → corre los 4 flujos en orden
+/qa agenda              → vista día/semana/mes + asistencia rápida
+/qa booking             → flujo de disponibilidad y reservas (alumno)
+/qa all                 → corre los 5 flujos en orden
 ```
 
 ## Reglas de ejecución (obligatorias)
@@ -153,7 +154,54 @@ deletePlanTemplate, setDefaultPlanTemplate, getPublicPlans),
 **Tabla:** `profiles`. **RLS:** depende de role; admin lee todas, teacher
 lee asignadas, student lee la propia.
 
-### 4. `booking` — Disponibilidad + reservas
+### 4. `agenda` — Vista día/semana/mes del profesor + asistencia rápida
+
+**Setup:** profesor con ≥1 disponibilidad creada, ≥2 bookings en fechas dentro del rango (hoy/semana/mes), ≥1 alumno con plan activo (`plans.is_active=true AND remaining_sessions>0`).
+
+```
+[ ] A1. Calendario → tab Agenda es el default
+[ ] A2. Tab indicator activo (cyan) en Agenda al cargar
+[ ] A3. Botones Día/Semana/Mes cambian el rango y el label arriba
+[ ] A4. Flecha ←/→ navega el rango (día previo, semana previa, mes previo)
+[ ] A5. Botón "Hoy" devuelve el cursor al día actual
+[ ] A6. Vista Día con bookings → muestra cada slot con hora + tipo + X/Y cupos
+[ ] A7. Slot con bookings muestra lista de alumnos con avatar de iniciales
+[ ] A8. Click ✓ en booking pendiente → toast "Asistencia confirmada · 1 clase
+        descontada del plan" si alumno tiene plan activo y profesional NO es
+        nutricionista
+[ ] A9. Después de A8: en DB `bookings.attended=true`,
+        `bookings.charged_from_plan=true`, `plans.remaining_sessions` decrementó 1
+[ ] A10. Click ✓ en booking de nutricionista → toast sin "descontada del plan",
+         charged_from_plan queda en false
+[ ] A11. Click ✗ → toast "Marcado como ausente", `attended=false`,
+         plan NO se descuenta
+[ ] A12. Vista Semana → muestra secciones por fecha SOLO con días que tienen slots
+[ ] A13. Vista Mes → idem semana pero en rango mensual
+[ ] A14. Contadores arriba: "N reservas · K por confirmar" reflejan el rango
+[ ] A15. Empty state cuando no hay sesiones en el rango (EmptyState component)
+[ ] A16. Loading: skeleton cards mientras carga (no spinner)
+[ ] A17. Panel principal (DashboardSection): "Ver agenda completa →" en header
+         de Próximas clases navega a tab Calendario
+[ ] A18. Panel principal: clases de HOY pendientes muestran ✓/✗ inline
+[ ] A19. Panel principal: clases futuras (no hoy) muestran "Próxima" en vez de
+         ✓/✗ (no saturar)
+[ ] A20. Tab Disponibilidades en mobile: slots agrupados por día en <details>,
+         día actual abierto, otros colapsados
+[ ] A21. Acciones de disponibilidad mobile (Alumnos/Editar/Eliminar) en grid
+         3-col con tap targets ≥44px
+```
+
+**Archivos:** `client/components/dashboard/AgendaView.tsx`,
+`client/components/dashboard/sections/CalendarSection.tsx`,
+`client/components/dashboard/sections/DashboardSection.tsx`,
+`client/components/dashboard/AvailabilityManager.tsx`,
+`client/services/supabase.ts` (getProfessionalSchedule, confirmBookingAttendance).
+
+**Tablas:** `bookings`, `availability`, `plans`, `attendance`.
+**RPC:** `confirm_booking_attendance(p_booking_id, p_attended)` — atómico:
+update attended + decrement plan.remaining_sessions si aplica.
+
+### 5. `booking` — Disponibilidad + reservas
 
 **Setup:** profesor con disponibilidad configurada; alumno con plan activo.
 
