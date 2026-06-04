@@ -10,9 +10,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   getTodayOverview, supabase, confirmBookingAttendance,
   findStudentsMissingMonthlyEval,
+  findStudentsMissingNutritionBooking,
   type TodayOverview,
 } from "@/services/supabase";
-import { ClipboardCheck } from "lucide-react";
+import { ClipboardCheck, Apple } from "lucide-react";
 
 interface NextClass {
   id: string;
@@ -55,6 +56,12 @@ interface MissingEvalRow {
   student_id: string;
   student_name?: string;
   last_eval?: string | null;
+}
+
+interface MissingNutriRow {
+  student_id: string;
+  student_name?: string;
+  student_phone?: string | null;
 }
 
 const MONTHS_ES = [
@@ -129,6 +136,7 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
   const [heat, setHeat] = useState<HeatCell[]>([]);
   const [assignedCount, setAssignedCount] = useState<number | null>(null);
   const [missingEvals, setMissingEvals] = useState<MissingEvalRow[]>([]);
+  const [missingNutri, setMissingNutri] = useState<MissingNutriRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
 
@@ -277,7 +285,10 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
           nameById.set(r.id, r.full_name);
         }
         const ids = Array.from(nameById.keys());
-        const missRes = await findStudentsMissingMonthlyEval(ids);
+        const [missRes, nutriRes] = await Promise.all([
+          findStudentsMissingMonthlyEval(ids),
+          findStudentsMissingNutritionBooking(ids),
+        ]);
         if (missRes.success) {
           setMissingEvals(
             (missRes.data || []).slice(0, 8).map((r) => ({
@@ -286,6 +297,9 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
               last_eval: r.last_eval,
             })),
           );
+        }
+        if (nutriRes.success) {
+          setMissingNutri((nutriRes.data || []).slice(0, 8));
         }
       } else {
         // Teacher: derive assigned student ids from their bookings (last 60d + future)
@@ -302,7 +316,7 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
         setAssignedCount(ids.length);
 
         if (ids.length > 0) {
-          const [planRes, nameRes, missRes] = await Promise.all([
+          const [planRes, nameRes, missRes, nutriRes] = await Promise.all([
             supabase
               .from("plans")
               .select("id, student_id, name, expiry_date, remaining_sessions, student:profiles!plans_student_id_fkey(full_name, phone)")
@@ -317,6 +331,7 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
               .select("id, full_name")
               .in("id", ids),
             findStudentsMissingMonthlyEval(ids),
+            findStudentsMissingNutritionBooking(ids),
           ]);
 
           if (!planRes.error && planRes.data) {
@@ -345,6 +360,9 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
                 last_eval: r.last_eval,
               })),
             );
+          }
+          if (nutriRes.success) {
+            setMissingNutri((nutriRes.data || []).slice(0, 8));
           }
         }
       }
@@ -487,14 +505,66 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
             <ExpiringPlansCard items={expiring} />
           </div>
 
-          {/* Heatmap + Missing evals */}
-          <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-            <HeatmapCard cells={heat} />
+          {/* Heatmap full width */}
+          <HeatmapCard cells={heat} />
+
+          {/* Missing evals + Missing nutri */}
+          <div className="grid gap-4 lg:grid-cols-2">
             <MissingEvalsCard items={missingEvals} />
+            <MissingNutriCard items={missingNutri} />
           </div>
         </>
       )}
     </div>
+  );
+}
+
+// =============================================================
+// Missing nutrition control booking
+// =============================================================
+function MissingNutriCard({ items }: { items: MissingNutriRow[] }) {
+  return (
+    <section className="bg-[#0f131a] border border-white/[0.06] rounded-xl overflow-hidden">
+      <header className="px-5 py-4 border-b border-white/[0.06] flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Apple className="w-4 h-4 text-green-300" />
+          <h2 className="text-white font-semibold font-lexend text-sm">Control nutricional pendiente</h2>
+        </div>
+        <span className="text-[10px] text-gray-500 uppercase tracking-wider">Este mes</span>
+      </header>
+      {items.length === 0 ? (
+        <p className="p-8 text-center text-gray-500 text-sm">
+          Todos los planes con nutri al día este mes.
+        </p>
+      ) : (
+        <ul className="divide-y divide-white/[0.04]">
+          {items.map((r) => {
+            const wa = whatsappUrl(r.student_phone);
+            return (
+              <li key={r.student_id} className="px-4 sm:px-5 py-3 flex items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-white text-sm font-medium truncate">{r.student_name || "Alumno"}</p>
+                  <p className="text-gray-500 text-xs mt-0.5">Sin cita con nutricionista este mes</p>
+                </div>
+                {wa ? (
+                  <a
+                    href={wa}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-500/15 border border-emerald-500/25 text-emerald-300 hover:bg-emerald-500/25 transition text-xs font-semibold flex-shrink-0 min-h-[40px]"
+                  >
+                    <PhoneCall className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">WhatsApp</span>
+                  </a>
+                ) : (
+                  <span className="text-[10px] uppercase tracking-wider text-gray-600 flex-shrink-0">Sin tel.</span>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
   );
 }
 

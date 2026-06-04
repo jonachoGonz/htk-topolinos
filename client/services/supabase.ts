@@ -2540,6 +2540,62 @@ export async function deleteStrengthEvaluation(
 }
 
 /**
+ * For the teacher panel "nutritionist control pending" widget.
+ * Among the given student ids, returns those whose active plan has
+ * has_nutrition_tracking=true AND who have NO booking with a
+ * nutritionist in the current calendar month.
+ */
+export async function findStudentsMissingNutritionBooking(
+  studentIds: string[]
+): Promise<{
+  success: boolean;
+  data?: Array<{ student_id: string; student_name?: string; student_phone?: string | null }>;
+  error?: string;
+}> {
+  if (studentIds.length === 0) return { success: true, data: [] };
+  try {
+    const { data: plans, error: planErr } = await supabase
+      .from("plans")
+      .select("student_id, student:profiles!plans_student_id_fkey(full_name, phone)")
+      .eq("is_active", true)
+      .eq("has_nutrition_tracking", true)
+      .in("student_id", studentIds);
+    if (planErr) return { success: false, error: planErr.message };
+    const eligible = (plans as any[]) || [];
+    if (eligible.length === 0) return { success: true, data: [] };
+
+    const eligibleIds = eligible.map((p) => p.student_id);
+    const monthStart = new Date();
+    monthStart.setDate(1);
+    const monthStartIso = monthStart.toISOString().slice(0, 10);
+
+    const { data: bookings, error: bookErr } = await supabase
+      .from("bookings")
+      .select("student_id")
+      .in("student_id", eligibleIds)
+      .eq("professional_type", "nutritionist")
+      .in("status", ["confirmed", "completed"])
+      .gte("booking_date", monthStartIso);
+    if (bookErr) return { success: false, error: bookErr.message };
+
+    const bookedSet = new Set(
+      ((bookings as { student_id: string }[]) || []).map((b) => b.student_id),
+    );
+
+    return {
+      success: true,
+      data: eligible
+        .filter((p) => !bookedSet.has(p.student_id))
+        .map((p) => ({
+          student_id: p.student_id,
+          student_name: p.student?.full_name,
+          student_phone: p.student?.phone,
+        })),
+    };
+  } catch (e) { return { success: false, error: String(e) }; }
+}
+
+/**
  * For the teacher panel "missing monthly evaluation" widget.
  * Given a set of student ids, returns those whose most recent
  * body_evaluation is older than 30 days (or who have none).
