@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Save, Loader2, Plus, X, Award, GraduationCap, Languages, Globe, Instagram, Linkedin } from "lucide-react";
 import { toast } from "sonner";
 import {
-  getTeacherProfile, updateTeacherProfile,
+  getTeacherProfile, updateTeacherProfile, supabase,
   type TeacherProfile, type Certification,
 } from "@/services/supabase";
 import PhotoUploader from "./PhotoUploader";
@@ -30,9 +30,20 @@ export default function TeacherProfileForm({ teacherId }: TeacherProfileFormProp
 
   useEffect(() => {
     setLoading(true);
-    getTeacherProfile(teacherId).then((r) => {
-      if (r.success && r.data) setForm(r.data);
-      else toast.error(`Error: ${r.error}`);
+    Promise.all([
+      getTeacherProfile(teacherId),
+      // profiles.email is often null because the canonical email lives in
+      // auth.users. Pull it from there so Mi Perfil shows the real address.
+      supabase.auth.getUser(),
+    ]).then(([profRes, authRes]) => {
+      const profile = profRes.success ? profRes.data : null;
+      const authEmail = authRes.data?.user?.email;
+      if (!profRes.success) toast.error(`Error: ${profRes.error}`);
+      setForm({
+        ...(profile ?? {}),
+        // prefer the profile.email if explicitly set, fall back to auth.users
+        email: profile?.email || authEmail || "",
+      });
       setLoading(false);
     });
   }, [teacherId]);
@@ -98,6 +109,7 @@ export default function TeacherProfileForm({ teacherId }: TeacherProfileFormProp
           patientId={teacherId}
           currentUrl={form.photo_url}
           onChange={(url) => set("photo_url", url as any)}
+          label="Foto del profesional"
         />
       </div>
 

@@ -7,12 +7,22 @@ interface PhotoUploaderProps {
   patientId: string;
   currentUrl?: string;
   onChange: (url: string | null) => void;
+  /**
+   * Label shown above the upload buttons. Defaults to "Foto del paciente"
+   * for the patient form, but Mi Perfil for the professional passes
+   * "Foto del profesional" instead.
+   */
+  label?: string;
+  /** alt attribute for the preview img. Defaults to the label. */
+  alt?: string;
 }
 
 const BUCKET = "patient-photos";
 const MAX_SIZE_MB = 5;
 
-export default function PhotoUploader({ patientId, currentUrl, onChange }: PhotoUploaderProps) {
+export default function PhotoUploader({ patientId, currentUrl, onChange, label, alt }: PhotoUploaderProps) {
+  const displayLabel = label ?? "Foto del paciente";
+  const altText = alt ?? displayLabel;
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -77,7 +87,7 @@ export default function PhotoUploader({ patientId, currentUrl, onChange }: Photo
         {preview ? (
           <img
             src={preview}
-            alt="Foto del paciente"
+            alt={altText}
             className="w-24 h-24 rounded-xl object-cover border border-white/10"
           />
         ) : (
@@ -100,7 +110,7 @@ export default function PhotoUploader({ patientId, currentUrl, onChange }: Photo
       {/* Buttons */}
       <div className="flex-1 space-y-2">
         <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold">
-          Foto del paciente (opcional, máx {MAX_SIZE_MB} MB)
+          {displayLabel} (opcional, máx {MAX_SIZE_MB} MB)
         </p>
         <div className="flex flex-wrap gap-2">
           <button

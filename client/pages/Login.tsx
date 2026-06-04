@@ -70,16 +70,18 @@ export default function Login() {
     }
 
     if (actualRole !== expectedRole) {
-      // Sign out the just-created session so the persisted-session
-      // useEffect cannot rebound them straight to the wrong dashboard
-      // once loading flips false, and so they can re-attempt on the
-      // correct tab without a stale session lingering.
-      await supabase.auth.signOut();
+      // Show the error immediately — React flushes this state update on
+      // the microtask boundary before the await, so the user sees feedback
+      // in ~50ms instead of waiting for signOut's network round-trip
+      // (~4s). Then await signOut to flip auth state to null. Keeping
+      // `loading=true` during the await is intentional: it gates the
+      // persisted-session useEffect from racing us to the wrong dashboard.
       setError(
         actualRole === "teacher"
           ? "Esta cuenta es de profesional. Cambia al ingreso de Profesor."
           : "Esta cuenta es de alumno. Cambia al ingreso de Alumno.",
       );
+      await supabase.auth.signOut();
       setLoading(false);
       return;
     }
@@ -92,6 +94,19 @@ export default function Login() {
     });
   }
 
+  // Map known Supabase auth error messages to Spanish, with a graceful
+  // fallback to the raw text if we don't recognise it.
+  function translateAuthError(raw?: string): string {
+    if (!raw) return "Error al iniciar sesión.";
+    const s = raw.toLowerCase();
+    if (s.includes("invalid login credentials")) return "Email o contraseña incorrectos.";
+    if (s.includes("email not confirmed")) return "Email aún no confirmado. Revisa tu bandeja de entrada.";
+    if (s.includes("user not found")) return "No existe una cuenta con ese email.";
+    if (s.includes("rate limit") || s.includes("too many")) return "Demasiados intentos. Espera un momento e intenta de nuevo.";
+    if (s.includes("network")) return "Sin conexión. Verifica tu internet e intenta de nuevo.";
+    return raw; // unknown — show the original
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -102,7 +117,7 @@ export default function Login() {
           ? await loginTeacher(identity, password)
           : await loginStudent(identity, password);
       if (!result.success) {
-        setError(result.error ?? "Error al iniciar sesión.");
+        setError(translateAuthError(result.error));
         setLoading(false);
         return;
       }
