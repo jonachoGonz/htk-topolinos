@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { X, StickyNote, Pause, Play, Trash2, Pin, Plus, Loader2, ClipboardList, AlertTriangle } from "lucide-react";
+import { X, StickyNote, Pause, Play, Trash2, Pin, Plus, Loader2, ClipboardList, AlertTriangle, LineChart } from "lucide-react";
 import { toast } from "sonner";
 import {
   getPatient, getPatientNotes, addPatientNote, deletePatientNote,
@@ -8,6 +8,7 @@ import {
 } from "@/services/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import PatientForm from "./PatientForm";
+import EvaluationsPanel from "./EvaluationsPanel";
 
 interface PatientDetailModalProps {
   patientId: string;
@@ -18,7 +19,7 @@ interface PatientDetailModalProps {
   onChanged: () => void;
 }
 
-type Tab = "form" | "notes" | "attendance" | "pause";
+type Tab = "form" | "notes" | "attendance" | "evaluations" | "pause";
 
 const CRITICAL_KEYS = new Set([
   "diabetes_t1", "epilepsia", "cardio", "marcapasos", "embarazo", "cancer",
@@ -97,6 +98,9 @@ export default function PatientDetailModal({
           <TabBtn active={tab === "attendance"} onClick={() => setTab("attendance")}>
             <ClipboardList className="w-3.5 h-3.5" /> Asistencia
           </TabBtn>
+          <TabBtn active={tab === "evaluations"} onClick={() => setTab("evaluations")}>
+            <LineChart className="w-3.5 h-3.5" /> Evaluaciones
+          </TabBtn>
           {isAdmin && (
             <TabBtn active={tab === "pause"} onClick={() => setTab("pause")}>
               {isPaused ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />} {isPaused ? "Reanudar" : "Pausar"}
@@ -109,6 +113,7 @@ export default function PatientDetailModal({
           {tab === "form" && <PatientForm patientId={patientId} onSaved={onChanged} onCancel={onClose} />}
           {tab === "notes" && <NotesPanel patientId={patientId} />}
           {tab === "attendance" && <AttendancePanel patientId={patientId} />}
+          {tab === "evaluations" && <EvaluationsPanel patientId={patientId} />}
           {tab === "pause" && (
             <PausePanel patientId={patientId} isPaused={isPaused} onChanged={() => { onChanged(); onClose(); }} />
           )}

@@ -2398,3 +2398,166 @@ export async function getRemainingPlanClasses(
     return { success: false, error: String(error) };
   }
 }
+
+// ============================================
+// EVALUATIONS (Migration 019)
+// ============================================
+
+export const STRENGTH_EXERCISES = [
+  { key: "sentadilla",          label: "Sentadilla" },
+  { key: "peso_muerto",         label: "Peso muerto" },
+  { key: "press_banca",         label: "Press banca" },
+  { key: "press_militar",       label: "Press militar" },
+  { key: "dominada",            label: "Dominada" },
+  { key: "remo",                label: "Remo" },
+  { key: "hip_thrust",          label: "Hip thrust" },
+  { key: "peso_muerto_rumano",  label: "Peso muerto rumano" },
+] as const;
+
+export type StrengthExerciseKey = typeof STRENGTH_EXERCISES[number]["key"];
+
+export interface BodyEvaluation {
+  id: string;
+  patient_id: string;
+  professional_id?: string | null;
+  measured_at: string;       // YYYY-MM-DD
+  weight_kg?: number | null;
+  body_fat_pct?: number | null;
+  muscle_mass_pct?: number | null;
+  bone_mass_pct?: number | null;
+  waist_cm?: number | null;
+  hip_cm?: number | null;
+  chest_cm?: number | null;
+  arm_cm?: number | null;
+  thigh_cm?: number | null;
+  calf_cm?: number | null;
+  notes?: string | null;
+  created_at: string;
+}
+
+export interface StrengthEvaluation {
+  id: string;
+  patient_id: string;
+  professional_id?: string | null;
+  measured_at: string;
+  exercise: StrengthExerciseKey;
+  weight_kg: number;
+  reps: number;
+  notes?: string | null;
+  created_at: string;
+}
+
+export async function listBodyEvaluations(
+  patientId: string
+): Promise<{ success: boolean; data?: BodyEvaluation[]; error?: string }> {
+  try {
+    const { data, error } = await supabase
+      .from("body_evaluations")
+      .select("*")
+      .eq("patient_id", patientId)
+      .order("measured_at", { ascending: false })
+      .limit(24);
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: (data as BodyEvaluation[]) || [] };
+  } catch (e) { return { success: false, error: String(e) }; }
+}
+
+export async function createBodyEvaluation(
+  payload: Omit<BodyEvaluation, "id" | "created_at"> & { professional_id?: string | null }
+): Promise<{ success: boolean; data?: BodyEvaluation; error?: string }> {
+  try {
+    const { data, error } = await supabase
+      .from("body_evaluations")
+      .insert(payload)
+      .select("*")
+      .single();
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: data as BodyEvaluation };
+  } catch (e) { return { success: false, error: String(e) }; }
+}
+
+export async function deleteBodyEvaluation(
+  id: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { error } = await supabase.from("body_evaluations").delete().eq("id", id);
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (e) { return { success: false, error: String(e) }; }
+}
+
+export async function listStrengthEvaluations(
+  patientId: string
+): Promise<{ success: boolean; data?: StrengthEvaluation[]; error?: string }> {
+  try {
+    const { data, error } = await supabase
+      .from("strength_evaluations")
+      .select("*")
+      .eq("patient_id", patientId)
+      .order("measured_at", { ascending: false })
+      .limit(200);
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: (data as StrengthEvaluation[]) || [] };
+  } catch (e) { return { success: false, error: String(e) }; }
+}
+
+export async function createStrengthEvaluation(
+  payload: Omit<StrengthEvaluation, "id" | "created_at"> & { professional_id?: string | null }
+): Promise<{ success: boolean; data?: StrengthEvaluation; error?: string }> {
+  try {
+    const { data, error } = await supabase
+      .from("strength_evaluations")
+      .insert(payload)
+      .select("*")
+      .single();
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: data as StrengthEvaluation };
+  } catch (e) { return { success: false, error: String(e) }; }
+}
+
+export async function deleteStrengthEvaluation(
+  id: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { error } = await supabase.from("strength_evaluations").delete().eq("id", id);
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (e) { return { success: false, error: String(e) }; }
+}
+
+/**
+ * For the teacher panel "missing monthly evaluation" widget.
+ * Given a set of student ids, returns those whose most recent
+ * body_evaluation is older than 30 days (or who have none).
+ */
+export async function findStudentsMissingMonthlyEval(
+  studentIds: string[]
+): Promise<{
+  success: boolean;
+  data?: Array<{ patient_id: string; last_eval?: string | null }>;
+  error?: string;
+}> {
+  if (studentIds.length === 0) return { success: true, data: [] };
+  try {
+    const { data, error } = await supabase
+      .from("body_evaluations")
+      .select("patient_id, measured_at")
+      .in("patient_id", studentIds)
+      .order("measured_at", { ascending: false });
+    if (error) return { success: false, error: error.message };
+
+    // Most-recent per patient
+    const latest = new Map<string, string>();
+    for (const r of (data as { patient_id: string; measured_at: string }[]) || []) {
+      if (!latest.has(r.patient_id)) latest.set(r.patient_id, r.measured_at);
+    }
+
+    const cutoffIso = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10);
+    const missing: Array<{ patient_id: string; last_eval?: string | null }> = [];
+    for (const id of studentIds) {
+      const last = latest.get(id);
+      if (!last || last < cutoffIso) missing.push({ patient_id: id, last_eval: last ?? null });
+    }
+    return { success: true, data: missing };
+  } catch (e) { return { success: false, error: String(e) }; }
+}

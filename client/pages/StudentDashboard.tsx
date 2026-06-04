@@ -50,7 +50,7 @@ export default function StudentDashboard() {
 
         {/* Scrollable content */}
         <main className="flex-1 overflow-y-auto bg-[#0a0e1a] px-5 pt-5 lg:px-6 lg:pt-6 pb-[calc(80px+env(safe-area-inset-bottom))] lg:pb-6">
-          {activeTab === "dashboard" && <StudentDashboardSection />}
+          {activeTab === "dashboard" && <StudentDashboardSection onNavigate={setActiveTab} />}
           {activeTab === "calendario" && <StudentCalendarSection studentId={user?.id || ""} />}
           {activeTab === "messages" && <MessagingPanel />}
           {activeTab === "pagos" && <StudentPaymentSection studentId={user?.id || ""} />}
