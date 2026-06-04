@@ -6,6 +6,7 @@ import {
   ArrowRight,
   Sparkles,
   AlertCircle,
+  Apple,
   Activity,
   Dumbbell,
   TrendingUp,
@@ -143,6 +144,15 @@ export default function StudentDashboardSection({ onNavigate }: Props = {}) {
 
   const monthlyTarget = plan?.monthly_class_count ?? 0;
   const unscheduledThisMonth = Math.max(0, monthlyTarget - bookedThisMonth);
+
+  const needsNutriBooking =
+    !!plan?.has_nutrition_tracking &&
+    !bookings.some(
+      (b) =>
+        b.professional_type === "nutritionist" &&
+        (b.status === "confirmed" || b.status === "completed") &&
+        b.booking_date.startsWith(monthPrefix),
+    );
 
   const planStatus = plan ? getPlanStatus(plan) : null;
   const planContractedAt = plan ? new Date(plan.created_at) : null;
@@ -331,6 +341,30 @@ export default function StudentDashboardSection({ onNavigate }: Props = {}) {
                 icon={<XCircle className="w-4 h-4" />}
               />
             </div>
+
+            {/* Alerta seguimiento nutri */}
+            {needsNutriBooking && (
+              <div className="flex items-start gap-3 p-4 rounded-xl border border-green-500/25 bg-green-500/[0.06]">
+                <div className="w-9 h-9 rounded-lg bg-green-500/15 flex items-center justify-center flex-shrink-0">
+                  <Apple className="w-5 h-5 text-green-300" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-green-100 font-semibold text-sm font-lexend">
+                    Te falta tu control mensual con nutricionista
+                  </p>
+                  <p className="text-green-200/70 text-xs font-inter mt-1">
+                    Tu plan incluye seguimiento nutricional. Aún no tienes cita agendada este mes.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={goToCalendar}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-green-400 text-green-950 font-semibold text-xs hover:bg-green-300 transition self-center flex-shrink-0 min-h-[40px]"
+                >
+                  Agendar
+                </button>
+              </div>
+            )}
 
             {/* Alerta clases sin agendar */}
             {plan && unscheduledThisMonth > 0 && (

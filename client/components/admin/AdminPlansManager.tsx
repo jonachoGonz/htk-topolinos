@@ -64,6 +64,7 @@ const emptyPlan = (): Omit<PlanTemplate, "id" | "created_at" | "updated_at"> => 
   display_order: 100,
   highlight: false,
   badge_text: null,
+  has_nutrition_tracking: false,
 });
 
 export default function AdminPlansManager() {
@@ -114,6 +115,7 @@ export default function AdminPlansManager() {
       display_order: p.display_order ?? 100,
       highlight: p.highlight ?? false,
       badge_text: p.badge_text ?? null,
+      has_nutrition_tracking: !!p.has_nutrition_tracking,
     });
     setShowForm(true);
   };
@@ -742,6 +744,19 @@ export default function AdminPlansManager() {
                   />
                   <span className="text-sm text-white font-inter">
                     Incluye sesiones de terapia / kinesiología / nutricional / otra
+                  </span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer pt-1">
+                  <input
+                    type="checkbox"
+                    checked={!!form.has_nutrition_tracking}
+                    onChange={(e) =>
+                      setForm({ ...form, has_nutrition_tracking: e.target.checked })
+                    }
+                    className="rounded"
+                  />
+                  <span className="text-sm text-white font-inter">
+                    Incluye seguimiento mensual con nutricionista
                   </span>
                 </label>
                 {form.includes_sessions && (

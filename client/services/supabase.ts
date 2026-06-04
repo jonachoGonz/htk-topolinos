@@ -82,6 +82,7 @@ export interface Plan {
   monthly_class_count?: number;
   expiry_date: string;
   is_active: boolean;
+  has_nutrition_tracking?: boolean;
   created_at: string;
 }
 
@@ -2131,6 +2132,7 @@ export interface PlanTemplate {
   display_order?: number;
   highlight?: boolean;
   badge_text?: string | null;
+  has_nutrition_tracking?: boolean;
   created_at?: string;
   updated_at?: string;
 }
@@ -2318,21 +2320,12 @@ export async function assignPlanToStudent(
   durationMonths: number = 1
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    // Try RPC first
-    const { data: rpcData, error: rpcError } = await supabase.rpc("admin_assign_plan_to_student", {
-      p_student_id: studentId,
-      p_plan_template_id: planTemplateId,
-      p_duration_months: durationMonths,
-    });
-
-    if (!rpcError && rpcData?.success) {
-      return { success: true };
-    }
-
-    // Fallback client-side
+    // Fetch template flags up front so both RPC and fallback paths can
+    // carry has_nutrition_tracking forward without depending on the RPC
+    // signature.
     const { data: template, error: tplErr } = await supabase
       .from("plan_templates")
-      .select("name, monthly_classes")
+      .select("name, monthly_classes, has_nutrition_tracking")
       .eq("id", planTemplateId)
       .single();
 
@@ -2340,29 +2333,50 @@ export async function assignPlanToStudent(
       return { success: false, error: tplErr?.message || "Template not found" };
     }
 
-    // Deactivate existing
-    await supabase
-      .from("plans")
-      .update({ is_active: false })
-      .eq("student_id", studentId)
-      .eq("is_active", true);
-
-    // Insert new
-    const totalSessions = template.monthly_classes * durationMonths;
-    const expiry = new Date();
-    expiry.setMonth(expiry.getMonth() + durationMonths);
-
-    const { error: insErr } = await supabase.from("plans").insert({
-      student_id: studentId,
-      name: template.name,
-      total_sessions: totalSessions,
-      remaining_sessions: totalSessions,
-      monthly_class_count: template.monthly_classes,
-      expiry_date: expiry.toISOString().split("T")[0],
-      is_active: true,
+    // Try RPC first
+    const { data: rpcData, error: rpcError } = await supabase.rpc("admin_assign_plan_to_student", {
+      p_student_id: studentId,
+      p_plan_template_id: planTemplateId,
+      p_duration_months: durationMonths,
     });
 
-    if (insErr) return { success: false, error: insErr.message };
+    const rpcOk = !rpcError && rpcData?.success;
+
+    if (!rpcOk) {
+      // Fallback client-side
+      // Deactivate existing
+      await supabase
+        .from("plans")
+        .update({ is_active: false })
+        .eq("student_id", studentId)
+        .eq("is_active", true);
+
+      // Insert new
+      const totalSessions = template.monthly_classes * durationMonths;
+      const expiry = new Date();
+      expiry.setMonth(expiry.getMonth() + durationMonths);
+
+      const { error: insErr } = await supabase.from("plans").insert({
+        student_id: studentId,
+        name: template.name,
+        total_sessions: totalSessions,
+        remaining_sessions: totalSessions,
+        monthly_class_count: template.monthly_classes,
+        expiry_date: expiry.toISOString().split("T")[0],
+        is_active: true,
+        has_nutrition_tracking: !!template.has_nutrition_tracking,
+      });
+
+      if (insErr) return { success: false, error: insErr.message };
+    } else if (template.has_nutrition_tracking) {
+      // RPC path: stamp the flag on the freshly-created active plan
+      await supabase
+        .from("plans")
+        .update({ has_nutrition_tracking: true })
+        .eq("student_id", studentId)
+        .eq("is_active", true);
+    }
+
     return { success: true };
   } catch (error) {
     return { success: false, error: String(error) };
