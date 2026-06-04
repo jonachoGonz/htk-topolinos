@@ -985,13 +985,13 @@ export async function getProfessionalSchedule(
   toDate: string,   // YYYY-MM-DD inclusive
 ): Promise<{ success: boolean; data?: ScheduleSlot[]; error?: string }> {
   try {
-    // 1) Bookings in the range
+    // 1) Bookings in the range — no embedded join (FK name not consistent
+    //    across environments). Fetch profiles separately and merge below.
     const { data: rows, error } = await supabase
       .from("bookings")
       .select(
         `id, student_id, booking_date, start_time, end_time, status,
-         attended, charged_from_plan, professional_type,
-         student:profiles!bookings_student_id_fkey(id, full_name)`,
+         attended, charged_from_plan, professional_type`,
       )
       .eq("professional_id", professionalId)
       .gte("booking_date", fromDate)
@@ -1000,6 +1000,17 @@ export async function getProfessionalSchedule(
       .order("booking_date", { ascending: true })
       .order("start_time", { ascending: true });
     if (error) return { success: false, error: error.message };
+
+    // 1b) Fetch student names in bulk (Teachers RLS policy allows reading them)
+    const studentIds = Array.from(new Set((rows || []).map((r: any) => r.student_id))).filter(Boolean);
+    const nameById = new Map<string, string>();
+    if (studentIds.length > 0) {
+      const { data: studentRows } = await supabase
+        .from("profiles")
+        .select("id, full_name")
+        .in("id", studentIds);
+      (studentRows || []).forEach((p: any) => nameById.set(p.id, p.full_name));
+    }
 
     // 2) Recurring availabilities for capacity lookup, keyed by (day_of_week, HH:MM)
     const { data: avail } = await supabase
@@ -1047,12 +1058,10 @@ export async function getProfessionalSchedule(
         };
         groups.set(key, g);
       }
-      // Supabase nested select can return an array or single object
-      const studentObj = Array.isArray(b.student) ? b.student[0] : b.student;
       g.bookings.push({
         id: b.id,
         student_id: b.student_id,
-        student_name: studentObj?.full_name ?? "Sin nombre",
+        student_name: nameById.get(b.student_id) ?? "Sin nombre",
         attended: b.attended ?? null,
         charged_from_plan: b.charged_from_plan ?? null,
         status: b.status,
