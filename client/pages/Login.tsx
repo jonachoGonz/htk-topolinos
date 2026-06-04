@@ -31,33 +31,42 @@ export default function Login() {
     else if (userRole === "student") navigate("/dashboard/student", { replace: true });
   }, [user, userRole, navigate]);
 
-  // Resolve the user's role directly from the `profiles` table after sign-in,
-  // independent of AuthContext's deferred lookup. This guarantees the redirect
-  // happens even if the auth-state listener races with this submit.
+  // Resolve the user's role from the JWT's app_metadata (populated by the
+  // sync trigger on profiles). Falls back to a profiles query only if the
+  // claims aren't there yet (older session before migration 017).
+  // No DB query in the happy path → cannot recurse, cannot fail on RLS cache.
   async function resolveAndRedirect(expectedRole: Role) {
-    const { data: authData } = await supabase.auth.getUser();
-    const uid = authData.user?.id;
-    if (!uid) {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const session = sessionData.session;
+    if (!session?.user) {
       setError("Sesión no encontrada. Intenta nuevamente.");
       setLoading(false);
       return;
     }
 
-    const { data: profile, error: pErr } = await supabase
-      .from("profiles")
-      .select("role, is_admin")
-      .eq("id", uid)
-      .single();
+    // Happy path: claims from JWT (migration 017)
+    const meta = (session.user.app_metadata ?? {}) as {
+      role?: Role;
+      is_admin?: boolean;
+    };
+    let actualRole: Role | undefined = meta.role;
 
-    if (pErr || !profile) {
-      setError(
-        "No encontramos tu perfil. Contáctanos para activar tu cuenta.",
-      );
+    // Legacy fallback for sessions issued before the JWT claims were populated
+    if (!actualRole) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", session.user.id)
+        .maybeSingle();
+      actualRole = profile?.role as Role | undefined;
+    }
+
+    if (!actualRole) {
+      setError("No encontramos tu perfil. Contáctanos para activar tu cuenta.");
       setLoading(false);
       return;
     }
 
-    const actualRole = profile.role as Role;
     if (actualRole !== expectedRole) {
       setError(
         actualRole === "teacher"
