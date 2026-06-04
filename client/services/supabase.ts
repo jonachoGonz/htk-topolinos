@@ -1900,7 +1900,18 @@ export async function adminCreatePatient(payload: {
     });
     const json = await res.json().catch(() => ({}));
     if (!res.ok) {
-      const msg = json.error || `HTTP ${res.status}`;
+      // 502 from Netlify usually means the function never executed —
+      // typical cause is missing SUPABASE_SERVICE_ROLE_KEY / SUPABASE_URL
+      // env vars in the Netlify site config.
+      let msg = json.error || `HTTP ${res.status}`;
+      if (res.status === 502 && !json.error) {
+        msg =
+          "La función serverless de creación no respondió. Revisa que " +
+          "SUPABASE_SERVICE_ROLE_KEY y SUPABASE_URL estén configuradas " +
+          "en Netlify → Site settings → Environment variables.";
+      } else if (res.status === 401 || res.status === 403) {
+        msg = "No tienes permisos para crear pacientes (se requiere admin).";
+      }
       return { success: false, error: msg };
     }
     return { success: true, user_id: json.user_id };
