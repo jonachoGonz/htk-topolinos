@@ -24,16 +24,17 @@ export default function StudentPricing() {
   const { user } = useAuth();
   const [plans, setPlans] = useState<PlanTemplate[]>([]);
 
-  // Feedback al volver de Mercado Pago vía back_urls
+  // Feedback al volver de Mercado Pago o Khipu vía back_urls
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const mp = params.get("mp");
-    if (!mp) return;
-    if (mp === "success") {
+    const kh = params.get("kh");
+    if (!mp && !kh) return;
+    if (mp === "success" || kh === "success") {
       toast.success("Pago confirmado. Tu plan se activará en unos segundos.");
     } else if (mp === "pending") {
       toast.message("Pago pendiente de confirmación bancaria.");
-    } else if (mp === "failure") {
+    } else if (mp === "failure" || kh === "cancel") {
       toast.error("El pago no se completó. Puedes intentarlo nuevamente.");
     }
     // Limpia los query params para no repetir el toast al recargar
@@ -75,9 +76,21 @@ export default function StudentPricing() {
     return discountValid ? Math.round(base * 0.9) : base; // simple 10% discount
   }, [selectedPlan, selectedPeriod, discountValid]);
 
-  const handleCheckoutMP = async () => {
+  // Ambas pasarelas comparten el contrato: enviamos planTemplateId, period
+  // y discountCode; el server crea el payment, llama a la pasarela y
+  // devuelve la URL a la que redirigir al alumno.
+  const PROVIDER_CONFIG = {
+    mp:    { fn: "mp-create-preference", urlKey: "init_point" as const,   label: "Mercado Pago" },
+    khipu: { fn: "khipu-create",         urlKey: "payment_url" as const,  label: "Khipu" },
+  };
+  type ProviderKey = keyof typeof PROVIDER_CONFIG;
+  const [activeProvider, setActiveProvider] = useState<ProviderKey | null>(null);
+
+  const handleCheckout = async (provider: ProviderKey) => {
     if (!selectedPlan || !user?.id) return;
+    setActiveProvider(provider);
     setProcessing(true);
+    const cfg = PROVIDER_CONFIG[provider];
     try {
       const { data: sess } = await supabase.auth.getSession();
       const token = sess?.session?.access_token;
@@ -85,7 +98,7 @@ export default function StudentPricing() {
         toast.error("Sesión expirada, vuelve a iniciar sesión.");
         return;
       }
-      const r = await fetch("/.netlify/functions/mp-create-preference", {
+      const r = await fetch(`/.netlify/functions/${cfg.fn}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -98,16 +111,17 @@ export default function StudentPricing() {
         }),
       });
       const json = await r.json().catch(() => ({}));
-      if (!r.ok || !json.init_point) {
-        toast.error(`Error iniciando pago: ${json.error || `HTTP ${r.status}`}`);
+      const url = json[cfg.urlKey];
+      if (!r.ok || !url) {
+        toast.error(`Error con ${cfg.label}: ${json.error || `HTTP ${r.status}`}`);
         return;
       }
-      // Redirect a Mercado Pago — el webhook activará el plan al confirmar
-      window.location.href = json.init_point;
+      window.location.href = url;
     } catch (e) {
       toast.error(`Error: ${String(e)}`);
     } finally {
       setProcessing(false);
+      setActiveProvider(null);
     }
   };
 
@@ -255,20 +269,34 @@ export default function StudentPricing() {
               <span className="text-2xl font-bold text-[#00d4ff]">{formatCLP(finalPrice)}</span>
             </div>
 
-            <div className="flex gap-2">
+            <div className="space-y-2">
+              <div className="flex flex-col sm:flex-row gap-2">
+                <button onClick={() => handleCheckout("mp")} disabled={processing || finalPrice === 0}
+                  className="flex-1 px-4 py-2.5 rounded-lg bg-[#00d4ff] hover:bg-cyan-300 text-[#05050A] text-sm font-bold transition disabled:opacity-40 flex items-center justify-center gap-2 min-h-[44px]">
+                  {processing && activeProvider === "mp"
+                    ? <Loader2 className="w-4 h-4 animate-spin" />
+                    : <CreditCard className="w-4 h-4" />}
+                  Mercado Pago
+                </button>
+                <button onClick={() => handleCheckout("khipu")} disabled={processing || finalPrice === 0}
+                  className="flex-1 px-4 py-2.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-sm font-bold transition disabled:opacity-40 flex items-center justify-center gap-2 min-h-[44px]">
+                  {processing && activeProvider === "khipu"
+                    ? <Loader2 className="w-4 h-4 animate-spin" />
+                    : <CreditCard className="w-4 h-4" />}
+                  Khipu (transferencia)
+                </button>
+              </div>
               <button onClick={() => setSelectedPlan(null)} disabled={processing}
-                className="flex-1 px-4 py-2 rounded-lg bg-white/[0.05] border border-white/10 text-white text-sm font-semibold hover:bg-white/[0.08] transition disabled:opacity-40">
+                className="w-full px-4 py-2 rounded-lg bg-white/[0.05] border border-white/10 text-white text-sm font-semibold hover:bg-white/[0.08] transition disabled:opacity-40">
                 Cancelar
-              </button>
-              <button onClick={handleCheckoutMP} disabled={processing || finalPrice === 0}
-                className="flex-1 px-4 py-2 rounded-lg bg-[#00d4ff] hover:bg-cyan-300 text-[#05050A] text-sm font-bold transition disabled:opacity-40 flex items-center justify-center gap-2">
-                {processing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
-                Pagar con Mercado Pago
               </button>
             </div>
 
-            <p className="text-[10px] text-gray-500 text-center">
-              Pago seguro vía Mercado Pago. Acepta tarjetas, transferencia, Webpay y Khipu.
+            <p className="text-[10px] text-gray-500 text-center leading-relaxed">
+              <strong className="text-gray-400">Mercado Pago:</strong> tarjetas, Webpay, transferencia.
+              <br />
+              <strong className="text-gray-400">Khipu:</strong> transferencia directa desde tu banco (comisión menor).
+              <br />
               Tu plan se activa automáticamente al confirmarse el pago.
             </p>
           </div>
