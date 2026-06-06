@@ -1911,7 +1911,12 @@ export async function adminCreatePatient(payload: {
           "SUPABASE_SERVICE_ROLE_KEY y SUPABASE_URL estén configuradas " +
           "en Netlify → Site settings → Environment variables.";
       } else if (res.status === 401 || res.status === 403) {
-        msg = "No tienes permisos para crear pacientes (se requiere admin).";
+        // Si el servidor mandó detalle (json.error), úsalo — trae info de
+        // diagnóstico como "Tu cuenta: X · is_admin=Y · profile_found=Z".
+        // Solo caemos al mensaje genérico si no llegó body.
+        if (!json.error) {
+          msg = "No tienes permisos para crear pacientes (se requiere admin).";
+        }
       }
       return { success: false, error: msg };
     }
