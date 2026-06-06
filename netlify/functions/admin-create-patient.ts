@@ -51,24 +51,19 @@ export const handler: Handler = async (event) => {
     }
     const { data: callerProfile, error: profileErr } = await sb
       .from("profiles")
-      .select("is_admin, role, full_name")
+      .select("is_admin")
       .eq("id", callerData.user.id)
       .single();
-    console.log("admin-create-patient: caller check", {
-      auth_user_id: callerData.user.id,
-      auth_email: callerData.user.email,
-      profile_found: !!callerProfile,
-      profile_err: profileErr?.message,
-      profile_is_admin: callerProfile?.is_admin,
-      profile_role: callerProfile?.role,
-      profile_name: callerProfile?.full_name,
-    });
     if (!callerProfile?.is_admin) {
+      if (profileErr) {
+        console.error("admin-create-patient: profile lookup failed", {
+          user_id: callerData.user.id,
+          err: profileErr.message,
+        });
+      }
       return {
         statusCode: 403,
-        body: JSON.stringify({
-          error: `Solo admin puede crear pacientes. Tu cuenta: ${callerData.user.email} · is_admin=${callerProfile?.is_admin ?? "null"} · profile_found=${!!callerProfile}`,
-        }),
+        body: JSON.stringify({ error: "Solo admin puede crear pacientes" }),
       };
     }
 
