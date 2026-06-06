@@ -40,7 +40,8 @@ export default function StudentTopBar({
         </span>
 
         {/* Nav tabs */}
-        <nav className="hidden md:flex items-center gap-1 ml-2">
+        {/* En desktop el sidebar ya muestra esta nav; aquí solo se ve en tablet. */}
+        <nav className="hidden md:flex lg:hidden items-center gap-1 ml-2">
           {visibleTabs.map((tab) => (
             <button
               key={tab}

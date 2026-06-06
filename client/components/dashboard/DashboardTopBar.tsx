@@ -36,8 +36,10 @@ export default function DashboardTopBar({ onMenuToggle, activeTab = "dashboard",
           <span className="text-[#00d4ff]">Plataforma Profesor</span>
         </span>
 
-        {/* Nav tabs */}
-        <nav className="hidden md:flex items-center gap-1 ml-2">
+        {/* Nav tabs — visibles solo en tablet. En desktop el sidebar ya
+            muestra esta navegación, evitamos duplicación. En mobile el
+            usuario usa el hamburger + sidebar deslizable + BottomNav. */}
+        <nav className="hidden md:flex lg:hidden items-center gap-1 ml-2">
           {visibleTabs.map((tab) => (
             <button
               key={tab}
