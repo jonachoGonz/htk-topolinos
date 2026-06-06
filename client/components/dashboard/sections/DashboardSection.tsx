@@ -822,7 +822,7 @@ function HourlyTrendCard({ cells }: { cells: HeatCell[] }) {
           </div>
           <span className="text-[10px] text-gray-500 uppercase tracking-wider tabular-nums flex-shrink-0">
             {dayFilter === -1
-              ? `${total} clases · próx. 14 días`
+              ? `${total} ${total === 1 ? "clase" : "clases"} · próx. 14 días`
               : `${filteredTotal} en ${DAY_FULL[dayFilter]} · próx. 14 días`}
           </span>
         </div>

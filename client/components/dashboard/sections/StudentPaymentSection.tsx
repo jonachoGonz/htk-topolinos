@@ -11,6 +11,18 @@ export default function StudentPaymentSection({ studentId }: StudentPaymentSecti
   const [plans, setPlans] = useState<Plan[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [tab, setTab] = useState<"history" | "buy">("history");
+  const [showAll, setShowAll] = useState(false);
+
+  // Mostrar siempre activos primero, después los últimos N vencidos, y un
+  // botón para expandir el resto. El historial completo puede tener muchos
+  // planes acumulados (cleanup conserva audit trail).
+  const HISTORY_LIMIT = 3;
+  const activePlans = plans.filter((p) => p.is_active);
+  const expiredPlans = plans.filter((p) => !p.is_active);
+  const visiblePlans = showAll
+    ? plans
+    : [...activePlans, ...expiredPlans.slice(0, HISTORY_LIMIT)];
+  const hiddenCount = plans.length - visiblePlans.length;
 
   useEffect(() => {
     if (!studentId) return;
@@ -96,14 +108,14 @@ export default function StudentPaymentSection({ studentId }: StudentPaymentSecti
                 <thead className="border-b border-white/[0.06]">
                   <tr className="text-left text-xs font-inter text-gray-400 uppercase tracking-wider">
                     <th className="px-6 py-3">Nombre del Plan</th>
-                    <th className="px-6 py-3">Sesiones</th>
+                    <th className="px-6 py-3">Total clases</th>
                     <th className="px-6 py-3">Restantes</th>
                     <th className="px-6 py-3">Vencimiento</th>
                     <th className="px-6 py-3">Estado</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/[0.04]">
-                  {plans.map((plan) => (
+                  {visiblePlans.map((plan) => (
                     <tr key={plan.id} className="hover:bg-white/[0.02] transition text-white">
                       <td className="px-6 py-3 font-medium">{plan.name}</td>
                       <td className="px-6 py-3">{plan.total_sessions}</td>
@@ -122,7 +134,7 @@ export default function StudentPaymentSection({ studentId }: StudentPaymentSecti
 
             {/* Mobile: cards */}
             <div className="sm:hidden divide-y divide-white/[0.04]">
-              {plans.map((plan) => (
+              {visiblePlans.map((plan) => (
                 <div key={plan.id} className="p-4 space-y-3">
                   <div className="flex items-start justify-between gap-2">
                     <p className="text-white font-semibold text-sm">{plan.name}</p>
@@ -145,6 +157,27 @@ export default function StudentPaymentSection({ studentId }: StudentPaymentSecti
                 </div>
               ))}
             </div>
+
+            {hiddenCount > 0 && (
+              <div className="border-t border-white/[0.04] px-6 py-3 text-center">
+                <button
+                  onClick={() => setShowAll(true)}
+                  className="text-xs font-semibold text-[#00d4ff] hover:text-cyan-300 transition"
+                >
+                  Ver {hiddenCount} {hiddenCount === 1 ? "plan más" : "planes más"} del historial
+                </button>
+              </div>
+            )}
+            {showAll && plans.length > HISTORY_LIMIT + activePlans.length && (
+              <div className="border-t border-white/[0.04] px-6 py-3 text-center">
+                <button
+                  onClick={() => setShowAll(false)}
+                  className="text-xs font-semibold text-gray-500 hover:text-gray-300 transition"
+                >
+                  Colapsar historial
+                </button>
+              </div>
+            )}
           </>
         )}
       </div>

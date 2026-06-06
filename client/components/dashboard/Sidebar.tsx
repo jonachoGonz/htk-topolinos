@@ -1,5 +1,7 @@
 import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/services/supabase";
 import {
   LayoutDashboard,
   CalendarDays,
@@ -56,8 +58,27 @@ export default function Sidebar({
 }: SidebarProps) {
   const navigate = useNavigate();
   const { signOut, isAdmin, user } = useAuth();
+  const [profileName, setProfileName] = useState<string | null>(null);
+
+  // Cargar full_name desde profiles. user.user_metadata.full_name a veces
+  // no está poblado para cuentas viejas; profiles.full_name es la fuente
+  // de verdad y la actualiza el alumno/admin al editar perfil.
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", user.id)
+      .single()
+      .then(({ data }) => {
+        if (!cancelled && data?.full_name) setProfileName(data.full_name);
+      });
+    return () => { cancelled = true; };
+  }, [user?.id]);
 
   const displayName =
+    profileName ||
     (user?.user_metadata as { full_name?: string } | null)?.full_name ||
     user?.email?.split("@")[0] ||
     "Usuario";
