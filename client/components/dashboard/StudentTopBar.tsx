@@ -60,7 +60,12 @@ export default function StudentTopBar({
       {/* Right: icons */}
       <div className="flex items-center gap-1 flex-shrink-0">
         <NotificationBell />
-        <button className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white transition rounded-lg hover:bg-white/5">
+        <button
+          onClick={() => onTabChange?.("configuracion")}
+          aria-label="Ir a configuración"
+          title="Configuración"
+          className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white transition rounded-lg hover:bg-white/5"
+        >
           <UserCircle className="w-[18px] h-[18px]" />
         </button>
       </div>

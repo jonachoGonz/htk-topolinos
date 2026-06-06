@@ -2559,17 +2559,29 @@ export async function findStudentsMissingNutritionBooking(
 }> {
   if (studentIds.length === 0) return { success: true, data: [] };
   try {
+    // Sin FK embed — el constraint plans_student_id_fkey no existe.
+    // Hacemos las queries en 2 pasos y mergeamos en cliente.
     const { data: plans, error: planErr } = await supabase
       .from("plans")
-      .select("student_id, student:profiles!plans_student_id_fkey(full_name, phone)")
+      .select("student_id")
       .eq("is_active", true)
       .eq("has_nutrition_tracking", true)
       .in("student_id", studentIds);
     if (planErr) return { success: false, error: planErr.message };
-    const eligible = (plans as any[]) || [];
+    const eligible = (plans as { student_id: string }[]) || [];
     if (eligible.length === 0) return { success: true, data: [] };
 
-    const eligibleIds = eligible.map((p) => p.student_id);
+    const eligibleIds = Array.from(new Set(eligible.map((p) => p.student_id)));
+
+    // Profiles para nombres+teléfonos
+    const { data: profs } = await supabase
+      .from("profiles")
+      .select("id, full_name, phone")
+      .in("id", eligibleIds);
+    const profileBy = new Map<string, { full_name?: string; phone?: string }>();
+    for (const p of (profs as { id: string; full_name?: string; phone?: string }[]) || []) {
+      profileBy.set(p.id, { full_name: p.full_name, phone: p.phone });
+    }
     const monthStart = new Date();
     monthStart.setDate(1);
     const monthStartIso = monthStart.toISOString().slice(0, 10);
@@ -2587,16 +2599,20 @@ export async function findStudentsMissingNutritionBooking(
       ((bookings as { student_id: string }[]) || []).map((b) => b.student_id),
     );
 
-    return {
-      success: true,
-      data: eligible
-        .filter((p) => !bookedSet.has(p.student_id))
-        .map((p) => ({
-          student_id: p.student_id,
-          student_name: p.student?.full_name,
-          student_phone: p.student?.phone,
-        })),
-    };
+    // Dedupe por student_id (puede haber múltiples planes activos por error)
+    const seen = new Set<string>();
+    const result: Array<{ student_id: string; student_name?: string; student_phone?: string | null }> = [];
+    for (const p of eligible) {
+      if (seen.has(p.student_id) || bookedSet.has(p.student_id)) continue;
+      seen.add(p.student_id);
+      const prof = profileBy.get(p.student_id);
+      result.push({
+        student_id: p.student_id,
+        student_name: prof?.full_name,
+        student_phone: prof?.phone,
+      });
+    }
+    return { success: true, data: result };
   } catch (e) { return { success: false, error: String(e) }; }
 }
 

@@ -177,9 +177,13 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
       const in14 = new Date(Date.now() + 14 * 86_400_000).toISOString().split("T")[0];
 
       // Admins see global scope; teachers are scoped to their own bookings.
+      // Importante: NO usar FK embed `profiles!bookings_student_id_fkey` —
+      // ese nombre de constraint no existe y devuelve 400. Hacemos las
+      // queries en 2 pasos y mergeamos en cliente (mismo patrón que
+      // getProfessionalSchedule).
       const nextQ = supabase
         .from("bookings")
-        .select("id, booking_date, start_time, end_time, student_id, attended, student:profiles!bookings_student_id_fkey(full_name)")
+        .select("id, booking_date, start_time, end_time, student_id, attended")
         .eq("status", "confirmed")
         .gte("booking_date", todayIso)
         .order("booking_date", { ascending: true })
@@ -189,7 +193,7 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
 
       const cancQ = supabase
         .from("bookings")
-        .select("id, booking_date, start_time, cancelled_at, notes, student_id, student:profiles!bookings_student_id_fkey(full_name, phone)")
+        .select("id, booking_date, start_time, cancelled_at, notes, student_id")
         .eq("status", "cancelled")
         .gte("cancelled_at", sevenAgo)
         .order("cancelled_at", { ascending: false })
@@ -220,23 +224,45 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
 
       if (ovRes.success) setOverview(ovRes.data || null);
 
-      if (!nextRes.error && nextRes.data) {
+      // Batch fetch profile (full_name, phone) para todos los student_id
+      // mencionados en nextRes + cancRes en UN solo round-trip
+      const allStudentIds = new Set<string>();
+      const nextRows = (!nextRes.error && nextRes.data) ? nextRes.data : [];
+      const cancRows = (!cancRes.error && cancRes.data) ? cancRes.data : [];
+      for (const r of nextRows as { student_id: string }[]) allStudentIds.add(r.student_id);
+      for (const r of cancRows as { student_id: string }[]) allStudentIds.add(r.student_id);
+
+      const profileBy = new Map<string, { full_name?: string; phone?: string }>();
+      if (allStudentIds.size > 0) {
+        const { data: profs } = await supabase
+          .from("profiles")
+          .select("id, full_name, phone")
+          .in("id", Array.from(allStudentIds));
+        for (const p of (profs as { id: string; full_name?: string; phone?: string }[]) || []) {
+          profileBy.set(p.id, { full_name: p.full_name, phone: p.phone });
+        }
+      }
+
+      if (nextRows.length > 0) {
         setNextClasses(
-          nextRes.data.map((b: any) => ({ ...b, student_name: b.student?.full_name })),
+          nextRows.map((b: any) => ({
+            ...b,
+            student_name: profileBy.get(b.student_id)?.full_name,
+          })),
         );
       }
 
-      if (!cancRes.error && cancRes.data) {
+      if (cancRows.length > 0) {
         setCancelled(
-          cancRes.data.map((b: any) => ({
+          cancRows.map((b: any) => ({
             id: b.id,
             booking_date: b.booking_date,
             start_time: b.start_time,
             cancelled_at: b.cancelled_at,
             notes: b.notes,
             student_id: b.student_id,
-            student_name: b.student?.full_name,
-            student_phone: b.student?.phone,
+            student_name: profileBy.get(b.student_id)?.full_name,
+            student_phone: profileBy.get(b.student_id)?.phone,
           })),
         );
       }
@@ -262,9 +288,10 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
       // Expiring plans + assigned students count: depend on scope (admin vs teacher)
       if (isAdmin) {
         const [planRes, studRes, allStudRes] = await Promise.all([
+          // Sin FK embed — 2-step manual abajo
           supabase
             .from("plans")
-            .select("id, student_id, name, expiry_date, remaining_sessions, student:profiles!plans_student_id_fkey(full_name, phone)")
+            .select("id, student_id, name, expiry_date, remaining_sessions")
             .eq("is_active", true)
             .gte("expiry_date", todayIso)
             .lte("expiry_date", in30)
@@ -276,17 +303,23 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
             .eq("role", "student"),
           supabase
             .from("profiles")
-            .select("id, full_name")
+            .select("id, full_name, phone")
             .eq("role", "student"),
         ]);
+
+        const allStudProfiles = (allStudRes.data as { id: string; full_name: string; phone?: string }[]) || [];
+        const profileBy2 = new Map<string, { full_name?: string; phone?: string }>();
+        for (const p of allStudProfiles) {
+          profileBy2.set(p.id, { full_name: p.full_name, phone: p.phone });
+        }
 
         if (!planRes.error && planRes.data) {
           setExpiring(
             planRes.data.map((p: any) => ({
               id: p.id,
               student_id: p.student_id,
-              student_name: p.student?.full_name,
-              student_phone: p.student?.phone,
+              student_name: profileBy2.get(p.student_id)?.full_name,
+              student_phone: profileBy2.get(p.student_id)?.phone,
               name: p.name,
               expiry_date: p.expiry_date,
               remaining_sessions: p.remaining_sessions,
@@ -297,9 +330,7 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
 
         // Missing monthly evaluation
         const nameById = new Map<string, string>();
-        for (const r of (allStudRes.data as { id: string; full_name: string }[]) || []) {
-          nameById.set(r.id, r.full_name);
-        }
+        for (const r of allStudProfiles) nameById.set(r.id, r.full_name);
         const ids = Array.from(nameById.keys());
         const [missRes, nutriRes] = await Promise.all([
           findStudentsMissingMonthlyEval(ids),
@@ -333,9 +364,10 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
 
         if (ids.length > 0) {
           const [planRes, nameRes, missRes, nutriRes] = await Promise.all([
+            // Sin FK embed — el join lo hacemos con nameRes en cliente
             supabase
               .from("plans")
-              .select("id, student_id, name, expiry_date, remaining_sessions, student:profiles!plans_student_id_fkey(full_name, phone)")
+              .select("id, student_id, name, expiry_date, remaining_sessions")
               .eq("is_active", true)
               .in("student_id", ids)
               .gte("expiry_date", todayIso)
@@ -344,19 +376,25 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
               .limit(8),
             supabase
               .from("profiles")
-              .select("id, full_name")
+              .select("id, full_name, phone")
               .in("id", ids),
             findStudentsMissingMonthlyEval(ids),
             findStudentsMissingNutritionBooking(ids),
           ]);
+
+          const teacherProfiles = (nameRes.data as { id: string; full_name: string; phone?: string }[]) || [];
+          const profileBy3 = new Map<string, { full_name?: string; phone?: string }>();
+          for (const p of teacherProfiles) {
+            profileBy3.set(p.id, { full_name: p.full_name, phone: p.phone });
+          }
 
           if (!planRes.error && planRes.data) {
             setExpiring(
               planRes.data.map((p: any) => ({
                 id: p.id,
                 student_id: p.student_id,
-                student_name: p.student?.full_name,
-                student_phone: p.student?.phone,
+                student_name: profileBy3.get(p.student_id)?.full_name,
+                student_phone: profileBy3.get(p.student_id)?.phone,
                 name: p.name,
                 expiry_date: p.expiry_date,
                 remaining_sessions: p.remaining_sessions,
@@ -365,7 +403,7 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
           }
 
           const nameById = new Map<string, string>();
-          for (const r of (nameRes.data as { id: string; full_name: string }[]) || []) {
+          for (const r of teacherProfiles) {
             nameById.set(r.id, r.full_name);
           }
           if (missRes.success) {
