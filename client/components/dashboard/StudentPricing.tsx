@@ -3,8 +3,8 @@ import { Check, Loader2, Sparkles, Tag, CreditCard } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  getPlanTemplates, getStudentPlan, assignPlanToStudent,
-  createNotificationForUser,
+  getPlanTemplates, getStudentPlan,
+  supabase,
   type PlanTemplate, type RenewalPeriod, type Plan,
 } from "@/services/supabase";
 
@@ -23,6 +23,24 @@ function formatCLP(n: number) {
 export default function StudentPricing() {
   const { user } = useAuth();
   const [plans, setPlans] = useState<PlanTemplate[]>([]);
+
+  // Feedback al volver de Mercado Pago vía back_urls
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const mp = params.get("mp");
+    if (!mp) return;
+    if (mp === "success") {
+      toast.success("Pago confirmado. Tu plan se activará en unos segundos.");
+    } else if (mp === "pending") {
+      toast.message("Pago pendiente de confirmación bancaria.");
+    } else if (mp === "failure") {
+      toast.error("El pago no se completó. Puedes intentarlo nuevamente.");
+    }
+    // Limpia los query params para no repetir el toast al recargar
+    const cleanUrl = window.location.pathname + (params.get("tab") ? `?tab=${params.get("tab")}` : "");
+    window.history.replaceState({}, "", cleanUrl);
+  }, []);
+
   const [currentPlan, setCurrentPlan] = useState<Plan | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedPlan, setSelectedPlan] = useState<PlanTemplate | null>(null);
@@ -57,48 +75,37 @@ export default function StudentPricing() {
     return discountValid ? Math.round(base * 0.9) : base; // simple 10% discount
   }, [selectedPlan, selectedPeriod, discountValid]);
 
-  const handleCheckout = async () => {
+  const handleCheckoutMP = async () => {
     if (!selectedPlan || !user?.id) return;
     setProcessing(true);
     try {
-      // 1. Try Stripe via Netlify function if STRIPE_PUBLISHABLE is set
-      //    (we don't have actual Stripe wired yet — gracefully fall back to direct assignment)
-      const months = PERIOD_MONTHS[selectedPeriod];
-
-      // Attempt Stripe checkout (will fail silently if not configured)
-      try {
-        const r = await fetch("/.netlify/functions/stripe-checkout", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            studentId: user.id,
-            planTemplateId: selectedPlan.id,
-            months,
-            amount: finalPrice,
-            discountCode: discountValid ? discountCode : null,
-          }),
-        });
-        if (r.ok) {
-          const { url } = await r.json();
-          if (url) { window.location.href = url; return; }
-        }
-      } catch { /* fall through to direct */ }
-
-      // 2. Fallback: direct plan assignment (admin assigns, no real payment)
-      const assignR = await assignPlanToStudent(user.id, selectedPlan.id, months);
-      if (assignR.success) {
-        toast.success(`Plan "${selectedPlan.name}" activado por ${months} mes(es). (Pasarela de pago no configurada — asignación directa)`);
-        await createNotificationForUser(
-          user.id, "plan_purchased",
-          "Plan activado", `Tu plan "${selectedPlan.name}" está activo`, "/dashboard/student"
-        );
-        setSelectedPlan(null);
-        // refresh
-        const cRes = await getStudentPlan(user.id);
-        if (cRes.success) setCurrentPlan(cRes.data || null);
-      } else {
-        toast.error(`Error: ${assignR.error}`);
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess?.session?.access_token;
+      if (!token) {
+        toast.error("Sesión expirada, vuelve a iniciar sesión.");
+        return;
       }
+      const r = await fetch("/.netlify/functions/mp-create-preference", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          planTemplateId: selectedPlan.id,
+          period: selectedPeriod,
+          discountCode: discountValid ? discountCode : null,
+        }),
+      });
+      const json = await r.json().catch(() => ({}));
+      if (!r.ok || !json.init_point) {
+        toast.error(`Error iniciando pago: ${json.error || `HTTP ${r.status}`}`);
+        return;
+      }
+      // Redirect a Mercado Pago — el webhook activará el plan al confirmar
+      window.location.href = json.init_point;
+    } catch (e) {
+      toast.error(`Error: ${String(e)}`);
     } finally {
       setProcessing(false);
     }
@@ -253,15 +260,16 @@ export default function StudentPricing() {
                 className="flex-1 px-4 py-2 rounded-lg bg-white/[0.05] border border-white/10 text-white text-sm font-semibold hover:bg-white/[0.08] transition disabled:opacity-40">
                 Cancelar
               </button>
-              <button onClick={handleCheckout} disabled={processing || finalPrice === 0}
+              <button onClick={handleCheckoutMP} disabled={processing || finalPrice === 0}
                 className="flex-1 px-4 py-2 rounded-lg bg-[#00d4ff] hover:bg-cyan-300 text-[#05050A] text-sm font-bold transition disabled:opacity-40 flex items-center justify-center gap-2">
                 {processing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
-                Pagar
+                Pagar con Mercado Pago
               </button>
             </div>
 
             <p className="text-[10px] text-gray-500 text-center">
-              Pago seguro vía Stripe. Recibirás un email de confirmación.
+              Pago seguro vía Mercado Pago. Acepta tarjetas, transferencia, Webpay y Khipu.
+              Tu plan se activa automáticamente al confirmarse el pago.
             </p>
           </div>
         </div>
