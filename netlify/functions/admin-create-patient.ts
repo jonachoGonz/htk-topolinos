@@ -11,6 +11,7 @@
  */
 
 import type { Handler } from "@netlify/functions";
+import { createClient } from "@supabase/supabase-js";
 import { sendEmail, htmlTemplate } from "./_email";
 
 export const handler: Handler = async (event) => {
@@ -27,10 +28,10 @@ export const handler: Handler = async (event) => {
     };
   }
 
-  const { createClient } = await import("@supabase/supabase-js");
-  const sb = createClient(supabaseUrl, serviceRoleKey);
-
   try {
+    const sb = createClient(supabaseUrl, serviceRoleKey);
+
+
     // Auth check: verify caller is admin
     const authHeader = event.headers.authorization || event.headers.Authorization;
     if (!authHeader?.startsWith("Bearer ")) {
