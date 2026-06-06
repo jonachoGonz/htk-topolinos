@@ -19,8 +19,14 @@ export const handler: Handler = async (event) => {
     return { statusCode: 405, body: "Method not allowed" };
   }
 
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  // Normaliza la URL: trim, sin trailing slash, sin paths Supabase comunes
+  // que la gente a veces copia de más al pegar en Netlify env vars
+  // (/rest/v1, /auth/v1). Sin esto, getUser() devuelve 404 "Invalid path".
+  const rawUrl = process.env.SUPABASE_URL?.trim() || "";
+  const supabaseUrl = rawUrl
+    .replace(/\/+$/, "")
+    .replace(/\/(rest|auth|storage|realtime)\/v\d+$/, "");
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() || "";
   if (!supabaseUrl || !serviceRoleKey) {
     return {
       statusCode: 500,
