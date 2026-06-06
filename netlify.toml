@@ -5,7 +5,12 @@ publish = "dist/spa"
 
 
 [functions]
-external_node_modules = ["express", "stripe", "@supabase/supabase-js"]
+# Notas:
+# - @supabase/supabase-js NO va en external_node_modules: con ESM + bundler
+#   esbuild, Netlify no incluye el paquete en el zip y la función crashea con
+#   ERR_MODULE_NOT_FOUND en runtime ("Cannot find package '@supabase/supabase-js'").
+#   Lo bundleamos directo.
+external_node_modules = ["express", "stripe"]
 node_bundler = "esbuild"
 
 # Hourly reminders + expiry warnings
