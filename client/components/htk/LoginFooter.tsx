@@ -1,6 +1,16 @@
-import { Phone, Mail, MapPin } from "lucide-react";
+import { Phone, Mail, MapPin, Instagram } from "lucide-react";
+
+// TikTok no está en lucide; usamos un SVG inline minimal.
+function TikTokIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>
+      <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5.8 20.1a6.34 6.34 0 0 0 10.86-4.43V8.93a8.16 8.16 0 0 0 4.77 1.52V7.07a4.85 4.85 0 0 1-1.84-.38z" />
+    </svg>
+  );
+}
 
 export default function LoginFooter() {
+  const currentYear = new Date().getFullYear();
   return (
     <footer className="w-full bg-black border-t border-white/5 font-lexend">
       <div className="max-w-6xl mx-auto px-5 py-16">
@@ -25,31 +35,22 @@ export default function LoginFooter() {
             {/* Social Icons */}
             <div className="flex items-center gap-4">
               <a
-                href="#"
-                aria-label="Share"
+                href="https://www.instagram.com/htk_center"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Instagram HTK Center"
                 className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition"
               >
-                <svg width="15" height="17" viewBox="0 0 15 17" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M12.5 16.6667C11.8056 16.6667 11.2153 16.4236 10.7292 15.9375C10.2431 15.4514 10 14.8611 10 14.1667C10 14.0833 10.0208 13.8889 10.0625 13.5833L4.20833 10.1667C3.98611 10.375 3.72917 10.5382 3.4375 10.6562C3.14583 10.7743 2.83333 10.8333 2.5 10.8333C1.80556 10.8333 1.21528 10.5903 0.729167 10.1042C0.243056 9.61806 0 9.02778 0 8.33333C0 7.63889 0.243056 7.04861 0.729167 6.5625C1.21528 6.07639 1.80556 5.83333 2.5 5.83333C2.83333 5.83333 3.14583 5.89236 3.4375 6.01042C3.72917 6.12847 3.98611 6.29167 4.20833 6.5L10.0625 3.08333C10.0347 2.98611 10.0174 2.89236 10.0104 2.80208C10.0035 2.71181 10 2.61111 10 2.5C10 1.80556 10.2431 1.21528 10.7292 0.729167C11.2153 0.243056 11.8056 0 12.5 0C13.1944 0 13.7847 0.243056 14.2708 0.729167C14.7569 1.21528 15 1.80556 15 2.5C15 3.19444 14.7569 3.78472 14.2708 4.27083C13.7847 4.75694 13.1944 5 12.5 5C12.1667 5 11.8542 4.94097 11.5625 4.82292C11.2708 4.70486 11.0139 4.54167 10.7917 4.33333L4.9375 7.75C4.96528 7.84722 4.98264 7.94097 4.98958 8.03125C4.99653 8.12153 5 8.22222 5 8.33333C5 8.44444 4.99653 8.54514 4.98958 8.63542C4.98264 8.72569 4.96528 8.81944 4.9375 8.91667L10.7917 12.3333C11.0139 12.125 11.2708 11.9618 11.5625 11.8438C11.8542 11.7257 12.1667 11.6667 12.5 11.6667C13.1944 11.6667 13.7847 11.9097 14.2708 12.3958C14.7569 12.8819 15 13.4722 15 14.1667C15 14.8611 14.7569 15.4514 14.2708 15.9375C13.7847 16.4236 13.1944 16.6667 12.5 16.6667Z" fill="white"/>
-                </svg>
+                <Instagram className="w-[18px] h-[18px] text-white" />
               </a>
               <a
-                href="#"
-                aria-label="Chrome"
+                href="https://tiktok.com/@HTK.center"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="TikTok HTK Center"
                 className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition"
               >
-                <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M8.33333 8.33333V8.33333V8.33333V8.33333V8.33333V8.33333V8.33333V8.33333V8.33333V8.33333V8.33333V8.33333V8.33333V8.33333V8.33333V8.33333V8.33333V8.33333M8.33333 16.6667C7.19444 16.6667 6.11806 16.4479 5.10417 16.0104C4.09028 15.5729 3.20486 14.9757 2.44792 14.2188C1.69097 13.4618 1.09375 12.5764 0.65625 11.5625C0.21875 10.5486 0 9.47222 0 8.33333C0 7.18056 0.21875 6.10069 0.65625 5.09375C1.09375 4.08681 1.69097 3.20486 2.44792 2.44792C3.20486 1.69097 4.09028 1.09375 5.10417 0.65625C6.11806 0.21875 7.19444 0 8.33333 0C9.48611 0 10.566 0.21875 11.5729 0.65625C12.5799 1.09375 13.4618 1.69097 14.2188 2.44792C14.9757 3.20486 15.5729 4.08681 16.0104 5.09375C16.4479 6.10069 16.6667 7.18056 16.6667 8.33333C16.6667 9.47222 16.4479 10.5486 16.0104 11.5625C15.5729 12.5764 14.9757 13.4618 14.2188 14.2188C13.4618 14.9757 12.5799 15.5729 11.5729 16.0104C10.566 16.4479 9.48611 16.6667 8.33333 16.6667Z" fill="white"/>
-                </svg>
-              </a>
-              <a
-                href="#"
-                aria-label="Clipboard"
-                className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition"
-              >
-                <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M7.91667 10.4167L13.75 6.66667L7.91667 2.91667V10.4167ZM5 13.3333C4.54167 13.3333 4.14931 13.1701 3.82292 12.8438C3.49653 12.5174 3.33333 12.125 3.33333 11.6667V1.66667C3.33333 1.20833 3.49653 0.815972 3.82292 0.489583C4.14931 0.163194 4.54167 0 5 0H15C15.4583 0 15.8507 0.163194 16.1771 0.489583C16.5035 0.815972 16.6667 1.20833 16.6667 1.66667V11.6667C16.6667 12.125 16.5035 12.5174 16.1771 12.8438C15.8507 13.1701 15.4583 13.3333 15 13.3333H5ZM5 11.6667H15V1.66667H5V11.6667ZM1.66667 16.6667C1.20833 16.6667 0.815972 16.5035 0.489583 16.1771C0.163194 15.8507 0 15.4583 0 15V3.33333H1.66667V15H13.3333V16.6667H1.66667Z" fill="white"/>
-                </svg>
+                <TikTokIcon className="w-[18px] h-[18px] text-white" />
               </a>
             </div>
           </div>
@@ -62,7 +63,10 @@ export default function LoginFooter() {
             <div className="space-y-4">
               <div className="flex items-center gap-3">
                 <Phone className="w-[18px] h-[18px] text-[#139fed] flex-shrink-0" />
-                <span className="text-white/60 text-sm">+56 9 1234 5678</span>
+                <a href="https://wa.me/56994748507" target="_blank" rel="noopener noreferrer"
+                   className="text-white/60 text-sm hover:text-white transition">
+                  +56 9 9474 8507
+                </a>
               </div>
               <div className="flex items-center gap-3">
                 <Mail className="w-[18px] h-[18px] text-[#139fed] flex-shrink-0" />
@@ -70,11 +74,16 @@ export default function LoginFooter() {
               </div>
               <div className="flex items-start gap-3">
                 <MapPin className="w-[18px] h-[18px] text-[#139fed] flex-shrink-0 mt-0.5" />
-                <span className="text-white/60 text-sm leading-5">
-                  Av. Providencia 1234,
+                <a
+                  href="https://maps.google.com/?q=José+Domingo+Cañas+1563+Santiago+Chile"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-white/60 text-sm leading-5 hover:text-white transition"
+                >
+                  José Domingo Cañas #1563,
                   <br />
                   Santiago, Chile
-                </span>
+                </a>
               </div>
             </div>
           </div>
@@ -104,16 +113,10 @@ export default function LoginFooter() {
         {/* Bottom bar */}
         <div className="border-t border-white/5 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-white/30 text-[10px] font-medium tracking-[1px] uppercase">
-            © 2024 HTK CENTER - ALL RIGHTS RESERVED
+            © {currentYear} HTK CENTER · TODOS LOS DERECHOS RESERVADOS
           </p>
-          <div className="flex items-center gap-6">
-            <a href="#" className="text-white/30 text-[10px] font-medium tracking-[1px] uppercase hover:text-white/60 transition">
-              TÉRMINOS Y CONDICIONES
-            </a>
-            <a href="#" className="text-white/30 text-[10px] font-medium tracking-[1px] uppercase hover:text-white/60 transition">
-              PRIVACIDAD
-            </a>
-          </div>
+          {/* Términos y Privacidad ocultos hasta que existan las páginas.
+              Cuando estén listas, des-comenta y apunta a /terminos /privacidad. */}
         </div>
       </div>
     </footer>
