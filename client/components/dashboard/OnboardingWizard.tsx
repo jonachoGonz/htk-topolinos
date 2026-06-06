@@ -31,7 +31,13 @@ export default function OnboardingWizard({ userId, onComplete }: Props) {
 
   const refresh = async () => {
     const r = await getOnboardingState(userId);
-    if (r.success) setState(r.data || null);
+    if (r.success) {
+      console.log("[onboarding] state refreshed:", r.data);
+      setState(r.data || null);
+    } else {
+      console.error("[onboarding] refresh failed:", r.error);
+      toast.error(`No se pudo recargar el estado: ${r.error}`);
+    }
   };
 
   useEffect(() => {
@@ -129,7 +135,20 @@ export default function OnboardingWizard({ userId, onComplete }: Props) {
                   className="px-4 py-2 rounded-lg bg-white/[0.05] border border-white/10 text-white text-sm transition">
                   Atrás
                 </button>
-                <button onClick={() => setStep("done")}
+                {!allFilled && (
+                  <button onClick={() => refresh()}
+                    className="px-4 py-2 rounded-lg bg-white/[0.05] border border-white/10 text-white text-sm transition"
+                    title="Si ya guardaste, recarga el estado">
+                    Recargar
+                  </button>
+                )}
+                <button
+                  onClick={async () => {
+                    // Refresh defensivo antes de avanzar: si el último save
+                    // no actualizó state por timing, esto lo desbloquea.
+                    await refresh();
+                    setStep("done");
+                  }}
                   disabled={!allFilled}
                   className="px-4 py-2 rounded-lg bg-[#00d4ff] hover:bg-cyan-300 text-[#05050A] text-sm font-bold transition disabled:opacity-40 flex items-center gap-2">
                   {allFilled ? "Continuar" : "Completa los datos pendientes"}

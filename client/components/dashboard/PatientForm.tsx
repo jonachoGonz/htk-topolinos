@@ -52,7 +52,7 @@ const COMMON_DISEASES = [
 
 interface PatientFormProps {
   patientId?: string; // if provided, edit mode
-  onSaved: () => void;
+  onSaved: () => void | Promise<void>;
   onCancel: () => void;
 }
 
@@ -186,7 +186,15 @@ export default function PatientForm({ patientId, onSaved, onCancel }: PatientFor
       const res = await updatePatient(patientId, form);
       if (res.success) {
         toast.success("Paciente actualizado");
-        onSaved();
+        // Await aquí es clave: el wizard de onboarding usa onSaved para
+        // refrescar su estado y decidir si puede avanzar al siguiente paso.
+        // Sin await, el wizard quedaba con el botón "Completa los datos
+        // pendientes" aunque la DB ya tuviera todo OK.
+        try {
+          await onSaved();
+        } catch (e) {
+          console.error("PatientForm onSaved error:", e);
+        }
       } else toast.error(`Error: ${res.error}`);
     } else {
       // Create flow: requires the student to already exist in auth.users
