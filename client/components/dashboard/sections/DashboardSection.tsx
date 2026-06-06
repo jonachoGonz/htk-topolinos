@@ -14,6 +14,15 @@ import {
   type TodayOverview,
 } from "@/services/supabase";
 import { ClipboardCheck, Apple } from "lucide-react";
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+} from "recharts";
 
 interface NextClass {
   id: string;
@@ -513,7 +522,7 @@ export default function DashboardSection({ onNavigate }: DashboardSectionProps =
           </div>
 
           {/* Heatmap full width */}
-          <HeatmapCard cells={heat} />
+          <HourlyTrendCard cells={heat} />
 
           {/* Missing evals + Missing nutri */}
           <div className="grid gap-4 lg:grid-cols-2">
@@ -726,97 +735,191 @@ function ExpiringPlansCard({ items }: { items: ExpiringPlan[] }) {
 }
 
 // =============================================================
-// Heatmap día/hora
+// Tendencia horaria (gráfico de líneas) con filtro por día
 // =============================================================
 const DAY_LABELS = ["L", "M", "X", "J", "V", "S", "D"];
+const DAY_FULL = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"];
 const HOURS = Array.from({ length: 13 }, (_, i) => 8 + i); // 8..20
 
-function HeatmapCard({ cells }: { cells: HeatCell[] }) {
-  const matrix = useMemo(() => {
-    const m: number[][] = Array.from({ length: 7 }, () => Array(HOURS.length).fill(0));
-    let max = 0;
-    for (const c of cells) {
-      const hIdx = c.hour - 8;
-      if (hIdx < 0 || hIdx >= HOURS.length) continue;
-      m[c.day][hIdx] = c.count;
-      if (c.count > max) max = c.count;
-    }
-    return { m, max };
+function HourlyTrendCard({ cells }: { cells: HeatCell[] }) {
+  // -1 = "Todos los días". 0..6 = L..D
+  const [dayFilter, setDayFilter] = useState<number>(-1);
+
+  const total = useMemo(() => cells.reduce((s, c) => s + c.count, 0), [cells]);
+
+  // Conteo por día → para deshabilitar chips de días sin actividad
+  const totalsPerDay = useMemo(() => {
+    const t = Array(7).fill(0);
+    for (const c of cells) t[c.day] += c.count;
+    return t;
   }, [cells]);
 
-  const total = cells.reduce((s, c) => s + c.count, 0);
+  // Serie horaria: para cada hora, suma de clases filtradas por día (o todas)
+  const lineData = useMemo(() => {
+    const byHour = new Map<number, number>();
+    for (const h of HOURS) byHour.set(h, 0);
+    for (const c of cells) {
+      if (dayFilter !== -1 && c.day !== dayFilter) continue;
+      byHour.set(c.hour, (byHour.get(c.hour) || 0) + c.count);
+    }
+    return HOURS.map((h) => ({
+      hour: h,
+      label: `${h}:00`,
+      count: byHour.get(h) || 0,
+    }));
+  }, [cells, dayFilter]);
 
-  const cellBg = (count: number) => {
-    if (count === 0) return "bg-white/[0.03]";
-    const t = matrix.max ? count / matrix.max : 0;
-    if (t > 0.75) return "bg-[#00d4ff]";
-    if (t > 0.5)  return "bg-[#00d4ff]/70";
-    if (t > 0.25) return "bg-[#00d4ff]/45";
-    return "bg-[#00d4ff]/20";
-  };
+  const filteredTotal = lineData.reduce((s, p) => s + p.count, 0);
+  const peak = lineData.reduce((best, p) => (p.count > best.count ? p : best), lineData[0]);
 
   return (
     <section className="bg-[#0f131a] border border-white/[0.06] rounded-xl overflow-hidden">
-      <header className="px-5 py-4 border-b border-white/[0.06] flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <TrendingUp className="w-4 h-4 text-[#00d4ff]" />
-          <h2 className="text-white font-semibold font-lexend text-sm">Tendencia de clases · día y hora</h2>
+      <header className="px-4 sm:px-5 py-4 border-b border-white/[0.06]">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2 min-w-0">
+            <TrendingUp className="w-4 h-4 text-[#00d4ff] flex-shrink-0" />
+            <h2 className="text-white font-semibold font-lexend text-sm truncate">
+              Tendencia horaria de clases
+            </h2>
+          </div>
+          <span className="text-[10px] text-gray-500 uppercase tracking-wider tabular-nums flex-shrink-0">
+            {dayFilter === -1
+              ? `${total} clases · próx. 14 días`
+              : `${filteredTotal} en ${DAY_FULL[dayFilter]} · próx. 14 días`}
+          </span>
         </div>
-        <span className="text-[10px] text-gray-500 uppercase tracking-wider tabular-nums">
-          {total} clases · próx. 14 días
-        </span>
+
+        {/* Chip filter — scroll horizontal en mobile, tap targets ≥40px */}
+        <div
+          className="mt-3 -mx-1 px-1 flex gap-1.5 overflow-x-auto snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          <DayChip
+            label="Todos"
+            active={dayFilter === -1}
+            count={total}
+            disabled={total === 0}
+            onClick={() => setDayFilter(-1)}
+          />
+          {DAY_LABELS.map((d, idx) => (
+            <DayChip
+              key={d}
+              label={d}
+              active={dayFilter === idx}
+              count={totalsPerDay[idx]}
+              disabled={totalsPerDay[idx] === 0}
+              onClick={() => setDayFilter(idx)}
+            />
+          ))}
+        </div>
       </header>
 
       {total === 0 ? (
-        <p className="p-8 text-center text-gray-500 text-sm">Sin clases agendadas en los próximos 14 días.</p>
+        <p className="p-8 text-center text-gray-500 text-sm">
+          Sin clases agendadas en los próximos 14 días.
+        </p>
+      ) : filteredTotal === 0 ? (
+        <p className="p-8 text-center text-gray-500 text-sm">
+          Sin clases el {DAY_FULL[dayFilter]}.
+        </p>
       ) : (
-        <div className="p-4 sm:p-5 overflow-x-auto">
-          <div
-            className="grid gap-1 min-w-[480px]"
-            style={{ gridTemplateColumns: `28px repeat(${HOURS.length}, minmax(0, 1fr))` }}
-          >
-            {/* header row */}
-            <div />
-            {HOURS.map((h) => (
-              <div key={h} className="text-center text-[10px] text-gray-500 font-inter tabular-nums">
-                {h}
-              </div>
-            ))}
-            {/* matrix rows */}
-            {DAY_LABELS.map((label, dayIdx) => (
-              <Row key={label} label={label} row={matrix.m[dayIdx]} cellBg={cellBg} />
-            ))}
+        <div className="px-2 sm:px-4 pt-4 pb-3">
+          <div className="h-[200px] sm:h-[240px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={lineData} margin={{ top: 8, right: 10, left: -18, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%"   stopColor="#00d4ff" stopOpacity={0.32} />
+                    <stop offset="100%" stopColor="#00d4ff" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid stroke="rgba(255,255,255,0.04)" vertical={false} />
+                <XAxis
+                  dataKey="hour"
+                  tick={{ fill: "#6b7280", fontSize: 10 }}
+                  axisLine={false}
+                  tickLine={false}
+                  interval="preserveStartEnd"
+                  tickFormatter={(h) => `${h}h`}
+                />
+                <YAxis
+                  tick={{ fill: "#6b7280", fontSize: 10 }}
+                  axisLine={false}
+                  tickLine={false}
+                  allowDecimals={false}
+                  width={28}
+                />
+                <Tooltip
+                  cursor={{ stroke: "rgba(0,212,255,0.25)", strokeWidth: 1 }}
+                  contentStyle={{
+                    background: "#05050A",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    borderRadius: 8,
+                    fontSize: 12,
+                    padding: "6px 10px",
+                  }}
+                  labelStyle={{ color: "#9ca3af" }}
+                  formatter={(v: any) => [`${v} ${v === 1 ? "clase" : "clases"}`, "Agendadas"]}
+                  labelFormatter={(h: any) => `${h}:00`}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="count"
+                  stroke="#00d4ff"
+                  strokeWidth={2}
+                  fill="url(#trendFill)"
+                  dot={{ fill: "#00d4ff", r: 3, strokeWidth: 0 }}
+                  activeDot={{ r: 5, stroke: "#0f131a", strokeWidth: 2 }}
+                  isAnimationActive={false}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
           </div>
-
-          {/* Legend */}
-          <div className="flex items-center justify-end gap-2 mt-3 text-[10px] text-gray-500">
-            <span>Menos</span>
-            <span className="w-3 h-3 rounded-sm bg-white/[0.03] border border-white/[0.06]" />
-            <span className="w-3 h-3 rounded-sm bg-[#00d4ff]/20" />
-            <span className="w-3 h-3 rounded-sm bg-[#00d4ff]/45" />
-            <span className="w-3 h-3 rounded-sm bg-[#00d4ff]/70" />
-            <span className="w-3 h-3 rounded-sm bg-[#00d4ff]" />
-            <span>Más</span>
-          </div>
+          {peak && peak.count > 0 && (
+            <p className="text-[11px] text-gray-500 px-3 pt-1 font-inter">
+              Hora pico:{" "}
+              <span className="text-white/90 tabular-nums font-semibold">
+                {peak.hour}:00
+              </span>{" "}
+              · {peak.count} {peak.count === 1 ? "clase" : "clases"}
+            </p>
+          )}
         </div>
       )}
     </section>
   );
 }
 
-function Row({ label, row, cellBg }: { label: string; row: number[]; cellBg: (n: number) => string }) {
+function DayChip({
+  label,
+  active,
+  count,
+  disabled,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  count: number;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
   return (
-    <>
-      <div className="text-[10px] text-gray-500 font-inter flex items-center justify-end pr-1">{label}</div>
-      {row.map((count, i) => (
-        <div
-          key={i}
-          title={count > 0 ? `${count} ${count === 1 ? "clase" : "clases"}` : "sin clases"}
-          className={`aspect-square rounded-sm ${cellBg(count)} flex items-center justify-center text-[9px] font-semibold ${count > 0 ? "text-[#05050A]" : "text-transparent"}`}
-        >
-          {count > 0 ? count : ""}
-        </div>
-      ))}
-    </>
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-pressed={active}
+      className={`snap-start flex-shrink-0 inline-flex items-center gap-1.5 px-3 min-h-[36px] rounded-full text-xs font-semibold font-inter transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00d4ff]/60 ${
+        active
+          ? "bg-[#00d4ff] text-[#05050A]"
+          : disabled
+          ? "bg-white/[0.03] text-gray-600 cursor-not-allowed"
+          : "bg-white/[0.04] text-gray-300 hover:bg-white/[0.08] hover:text-white"
+      }`}
+    >
+      <span>{label}</span>
+      {count > 0 && !active && (
+        <span className="text-[10px] text-gray-500 tabular-nums">{count}</span>
+      )}
+    </button>
   );
 }
