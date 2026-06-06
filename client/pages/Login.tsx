@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { loginTeacher, loginStudent, supabase } from "@/services/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import Navigation from "@/components/htk/Navigation";
-import LoginFooter from "@/components/htk/LoginFooter";
+import Footer from "@/components/htk/Footer";
 
 type Role = "teacher" | "student";
 
@@ -328,7 +328,7 @@ export default function Login() {
         </div>
       </main>
 
-      <LoginFooter />
+      <Footer />
     </div>
   );
 }

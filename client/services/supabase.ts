@@ -1814,7 +1814,9 @@ export async function getPatient(
   }
 }
 
-export async function getAllPatients(): Promise<{
+export async function getAllPatients(
+  roleFilter: "student" | "teacher" = "student",
+): Promise<{
   success: boolean;
   data?: PatientProfile[];
   error?: string;
@@ -1823,7 +1825,7 @@ export async function getAllPatients(): Promise<{
     const { data, error } = await supabase
       .from("profiles")
       .select(PATIENT_FIELDS)
-      .eq("role", "student")
+      .eq("role", roleFilter)
       .order("full_name", { ascending: true });
     if (error) return { success: false, error: error.message };
     return { success: true, data: (data as PatientProfile[]) || [] };
@@ -1885,6 +1887,12 @@ export async function adminCreatePatient(payload: {
   rut_dni?: string;
   password?: string;
   send_invite?: boolean;
+  /**
+   * "student" (default) o "teacher". Cuando es teacher la cuenta se crea
+   * con role='teacher' en profiles. El admin puede usar este flag para
+   * dar de alta profesionales del centro.
+   */
+  role?: "student" | "teacher";
 }): Promise<{ success: boolean; user_id?: string; error?: string }> {
   try {
     const { data: sess } = await supabase.auth.getSession();

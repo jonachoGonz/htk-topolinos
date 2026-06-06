@@ -1,16 +1,17 @@
 import { useState } from "react";
-import { Shield, Users, Package, UserCheck, BarChart3, Settings } from "lucide-react";
+import { Shield, Users, Package, UserCheck, BarChart3, Settings, Briefcase } from "lucide-react";
 import PatientsList from "@/components/dashboard/PatientsList";
 import AdminPlansManager from "@/components/admin/AdminPlansManager";
 import AdminPlanAssignment from "@/components/admin/AdminPlanAssignment";
 import AdminReports from "@/components/admin/AdminReports";
 import AdminSettings from "@/components/admin/AdminSettings";
 
-type AdminTab = "reports" | "students" | "plans" | "assignments" | "settings";
+type AdminTab = "reports" | "students" | "teachers" | "plans" | "assignments" | "settings";
 
 const TABS: { value: AdminTab; label: string; icon: any }[] = [
   { value: "reports",     label: "Reportes",        icon: BarChart3 },
   { value: "students",    label: "Alumnos",         icon: Users },
+  { value: "teachers",    label: "Profesionales",   icon: Briefcase },
   { value: "plans",       label: "Planes",          icon: Package },
   { value: "assignments", label: "Asignar planes",  icon: UserCheck },
   { value: "settings",    label: "Configuración",   icon: Settings },
@@ -55,7 +56,8 @@ export default function AdminSection() {
       </div>
 
       {tab === "reports"     && <AdminReports />}
-      {tab === "students"    && <PatientsList />}
+      {tab === "students"    && <PatientsList roleFilter="student" />}
+      {tab === "teachers"    && <PatientsList roleFilter="teacher" />}
       {tab === "plans"       && <AdminPlansManager />}
       {tab === "assignments" && <AdminPlanAssignment />}
       {tab === "settings"    && <AdminSettings />}

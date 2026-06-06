@@ -17,6 +17,12 @@ interface PatientsListProps {
   professionalId?: string;
   onAddNote?: (patientId: string) => void;
   onViewProgress?: (patientId: string) => void;
+  /**
+   * Filtra qué rol muestra el listado. Default "student" para no romper
+   * los usos existentes. AdminSection lo usa con "teacher" en el tab
+   * "Profesionales" reutilizando el mismo componente.
+   */
+  roleFilter?: "student" | "teacher";
 }
 
 // Critical conditions that warrant a visible alert badge on the list card.
@@ -45,7 +51,7 @@ function whatsappLink(phone: string): string {
   return `https://wa.me/${withCountry}`;
 }
 
-export default function PatientsList(_props: PatientsListProps) {
+export default function PatientsList({ roleFilter = "student" }: PatientsListProps) {
   const [patients, setPatients] = useState<PatientProfile[]>([]);
   const [attendance, setAttendance] = useState<Record<string, PatientAttendance>>({});
   const [loading, setLoading] = useState(false);
@@ -55,24 +61,33 @@ export default function PatientsList(_props: PatientsListProps) {
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [createForm, setCreateForm] = useState({
     full_name: "", email: "", phone: "", rut_dni: "", password: "", send_invite: false,
+    role: roleFilter as "student" | "teacher",
   });
   const [creating, setCreating] = useState(false);
   const { isAdmin } = useAuth();
 
+  const isTeacherView = roleFilter === "teacher";
+  const entityLabel = isTeacherView ? "profesional" : "paciente";
+  const entityLabelPlural = isTeacherView ? "profesionales" : "pacientes";
+
   const fetchAll = async () => {
     setLoading(true);
-    const [pRes, aRes] = await Promise.all([getAllPatients(), getAllPatientsAttendance()]);
+    // Solo cargamos asistencia para el listado de alumnos; los profesionales
+    // no la usan.
+    const requests: Promise<any>[] = [getAllPatients(roleFilter)];
+    if (!isTeacherView) requests.push(getAllPatientsAttendance());
+    const [pRes, aRes] = await Promise.all(requests);
     if (pRes.success) setPatients(pRes.data || []);
     else toast.error(`Error: ${pRes.error}`);
-    if (aRes.success) {
+    if (!isTeacherView && aRes?.success) {
       const map: Record<string, PatientAttendance> = {};
-      (aRes.data || []).forEach((s) => (map[s.patient_id] = s));
+      (aRes.data || []).forEach((s: PatientAttendance) => (map[s.patient_id] = s));
       setAttendance(map);
     }
     setLoading(false);
   };
 
-  useEffect(() => { fetchAll(); }, []);
+  useEffect(() => { fetchAll(); /* eslint-disable-next-line */ }, [roleFilter]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
@@ -101,16 +116,21 @@ export default function PatientsList(_props: PatientsListProps) {
       return;
     }
     setCreating(true);
-    const r = await adminCreatePatient(createForm);
+    const r = await adminCreatePatient({ ...createForm, role: createForm.role });
     if (r.success) {
-      toast.success(
-        createForm.send_invite
-          ? `Paciente creado. Email de invitación enviado a ${createForm.email}`
-          : `Paciente creado. Email: ${createForm.email} / Contraseña: ${createForm.password}`
-      );
+      const noun = createForm.role === "teacher" ? "Profesional" : "Paciente";
+      const created = createForm.role === "teacher" && roleFilter === "student"
+        ? `${noun} creado. Cambia al tab "Profesionales" para verlo.`
+        : (createForm.send_invite
+            ? `${noun} creado. Email de invitación enviado a ${createForm.email}`
+            : `${noun} creado. Email: ${createForm.email} / Contraseña: ${createForm.password}`);
+      toast.success(created);
       setCreateModalOpen(false);
-      setCreateForm({ full_name: "", email: "", phone: "", rut_dni: "", password: "", send_invite: false });
-      fetchAll();
+      setCreateForm({
+        full_name: "", email: "", phone: "", rut_dni: "", password: "", send_invite: false,
+        role: roleFilter,
+      });
+      if (createForm.role === roleFilter) fetchAll();
     } else {
       toast.error(`Error: ${r.error}`);
     }
@@ -294,13 +314,45 @@ export default function PatientsList(_props: PatientsListProps) {
             onClick={(e) => e.stopPropagation()}>
             <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between">
               <h3 className="text-lg font-bold text-white font-montserrat flex items-center gap-2">
-                <UserPlus className="w-5 h-5 text-[#00d4ff]" /> Crear paciente
+                <UserPlus className="w-5 h-5 text-[#00d4ff]" />
+                {createForm.role === "teacher" ? "Crear profesional" : "Crear paciente"}
               </h3>
               <button onClick={() => !creating && setCreateModalOpen(false)}
                 className="text-gray-400 hover:text-white"><X className="w-4 h-4" /></button>
             </div>
 
             <div className="p-5 space-y-3">
+              {/* Selector de rol — admin puede crear alumnos o profesionales */}
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-1.5 block">
+                  Tipo de cuenta *
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCreateForm({ ...createForm, role: "student" })}
+                    className={`px-3 py-2 rounded-lg border text-sm font-semibold transition ${
+                      createForm.role === "student"
+                        ? "bg-[#00d4ff]/15 border-[#00d4ff]/40 text-[#00d4ff]"
+                        : "bg-[#0f131a] border-white/10 text-gray-300 hover:border-white/20"
+                    }`}
+                  >
+                    Alumno
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCreateForm({ ...createForm, role: "teacher" })}
+                    className={`px-3 py-2 rounded-lg border text-sm font-semibold transition ${
+                      createForm.role === "teacher"
+                        ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-300"
+                        : "bg-[#0f131a] border-white/10 text-gray-300 hover:border-white/20"
+                    }`}
+                  >
+                    Profesional
+                  </button>
+                </div>
+              </div>
+
               <Field label="Nombre completo *">
                 <Input value={createForm.full_name}
                   onChange={(v) => setCreateForm({ ...createForm, full_name: v })} />
@@ -364,7 +416,7 @@ export default function PatientsList(_props: PatientsListProps) {
               <button onClick={handleCreate} disabled={creating}
                 className="px-4 py-2 rounded-lg bg-[#00d4ff] hover:bg-cyan-300 text-[#05050A] text-sm font-bold transition flex items-center gap-2 disabled:opacity-40">
                 {creating ? <Loader className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
-                Crear paciente
+                {createForm.role === "teacher" ? "Crear profesional" : "Crear paciente"}
               </button>
             </div>
           </div>

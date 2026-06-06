@@ -70,6 +70,11 @@ export const handler: Handler = async (event) => {
     // Parse body
     const body = JSON.parse(event.body || "{}");
     const { full_name, email, phone, rut_dni, password, send_invite } = body;
+    // Role: "student" (default) o "teacher". Cuando el admin crea un
+    // profesor, el profile queda con role='teacher' y el JWT del usuario
+    // refleja ese rol tras login.
+    const role: "student" | "teacher" =
+      body.role === "teacher" ? "teacher" : "student";
     if (!full_name?.trim() || !email?.trim()) {
       return { statusCode: 400, body: JSON.stringify({ error: "full_name y email son requeridos" }) };
     }
@@ -84,7 +89,7 @@ export const handler: Handler = async (event) => {
     let userId: string;
     if (send_invite) {
       const { data, error } = await sb.auth.admin.inviteUserByEmail(email, {
-        data: { full_name, role: "student" },
+        data: { full_name, role },
       });
       if (error) {
         if (/already|exists/i.test(error.message)) {
@@ -104,7 +109,7 @@ export const handler: Handler = async (event) => {
         email,
         password,
         email_confirm: true,
-        user_metadata: { full_name, role: "student" },
+        user_metadata: { full_name, role },
       });
       if (error) {
         if (/already|exists/i.test(error.message)) {
@@ -130,7 +135,7 @@ export const handler: Handler = async (event) => {
         email,
         phone: phone || null,
         rut_dni: rut_dni || null,
-        role: "student",
+        role,
         is_admin: false,
       },
       { onConflict: "id" }
