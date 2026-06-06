@@ -40,15 +40,30 @@ export const handler: Handler = async (event) => {
     const token = authHeader.slice("Bearer ".length);
     const { data: callerData, error: callerErr } = await sb.auth.getUser(token);
     if (callerErr || !callerData?.user) {
+      console.error("admin-create-patient: invalid token", callerErr);
       return { statusCode: 401, body: JSON.stringify({ error: "Invalid token" }) };
     }
-    const { data: callerProfile } = await sb
+    const { data: callerProfile, error: profileErr } = await sb
       .from("profiles")
-      .select("is_admin")
+      .select("is_admin, role, full_name")
       .eq("id", callerData.user.id)
       .single();
+    console.log("admin-create-patient: caller check", {
+      auth_user_id: callerData.user.id,
+      auth_email: callerData.user.email,
+      profile_found: !!callerProfile,
+      profile_err: profileErr?.message,
+      profile_is_admin: callerProfile?.is_admin,
+      profile_role: callerProfile?.role,
+      profile_name: callerProfile?.full_name,
+    });
     if (!callerProfile?.is_admin) {
-      return { statusCode: 403, body: JSON.stringify({ error: "Solo admin puede crear pacientes" }) };
+      return {
+        statusCode: 403,
+        body: JSON.stringify({
+          error: `Solo admin puede crear pacientes. Tu cuenta: ${callerData.user.email} · is_admin=${callerProfile?.is_admin ?? "null"} · profile_found=${!!callerProfile}`,
+        }),
+      };
     }
 
     // Parse body
