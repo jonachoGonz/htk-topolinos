@@ -2660,3 +2660,126 @@ export async function findStudentsMissingMonthlyEval(
     return { success: true, data: missing };
   } catch (e) { return { success: false, error: String(e) }; }
 }
+
+// ============================================
+// STUDENT ↔ PROFESSIONALS (M2M) - Migration 023
+// ============================================
+
+export interface StudentProfessionalLink {
+  student_id: string;
+  professional_id: string;
+  professional_type?: string | null;
+  assigned_at: string;
+  assigned_by?: string | null;
+  notes?: string | null;
+}
+
+/**
+ * Lista los profesionales asignados a un alumno (con datos del profesional
+ * para mostrar nombre y tipo en UI). Para el alumno y el admin.
+ */
+export async function listProfessionalsForStudent(
+  studentId: string,
+): Promise<{
+  success: boolean;
+  data?: Array<{
+    professional_id: string;
+    full_name?: string;
+    professional_type?: string | null;
+    assigned_at: string;
+  }>;
+  error?: string;
+}> {
+  try {
+    const { data: links, error } = await supabase
+      .from("student_professionals")
+      .select("professional_id, professional_type, assigned_at")
+      .eq("student_id", studentId);
+    if (error) return { success: false, error: error.message };
+    const rows = (links as Array<{ professional_id: string; professional_type?: string; assigned_at: string }>) || [];
+    if (rows.length === 0) return { success: true, data: [] };
+
+    const ids = rows.map((r) => r.professional_id);
+    const { data: profs } = await supabase
+      .from("profiles")
+      .select("id, full_name, professional_type")
+      .in("id", ids);
+    const profileBy = new Map<string, { full_name?: string; professional_type?: string }>();
+    for (const p of (profs as { id: string; full_name?: string; professional_type?: string }[]) || []) {
+      profileBy.set(p.id, p);
+    }
+    return {
+      success: true,
+      data: rows.map((r) => ({
+        professional_id: r.professional_id,
+        full_name: profileBy.get(r.professional_id)?.full_name,
+        professional_type: r.professional_type || profileBy.get(r.professional_id)?.professional_type || null,
+        assigned_at: r.assigned_at,
+      })),
+    };
+  } catch (e) { return { success: false, error: String(e) }; }
+}
+
+/**
+ * Lista los IDs de alumnos asignados a un profesional. Lo usa PatientsList
+ * cuando el caller es teacher (no admin) para filtrar su vista.
+ */
+export async function listAssignedStudentIds(
+  professionalId: string,
+): Promise<{ success: boolean; data?: string[]; error?: string }> {
+  try {
+    const { data, error } = await supabase
+      .from("student_professionals")
+      .select("student_id")
+      .eq("professional_id", professionalId);
+    if (error) return { success: false, error: error.message };
+    return {
+      success: true,
+      data: ((data as { student_id: string }[]) || []).map((r) => r.student_id),
+    };
+  } catch (e) { return { success: false, error: String(e) }; }
+}
+
+/**
+ * Admin: asigna un profesional a un alumno. RLS bloquea a no-admin.
+ */
+export async function assignProfessionalToStudent(
+  studentId: string,
+  professionalId: string,
+  professionalType?: string | null,
+  notes?: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { data: sess } = await supabase.auth.getSession();
+    const callerId = sess?.session?.user?.id;
+    const { error } = await supabase
+      .from("student_professionals")
+      .insert({
+        student_id: studentId,
+        professional_id: professionalId,
+        professional_type: professionalType || null,
+        assigned_by: callerId || null,
+        notes: notes || null,
+      });
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (e) { return { success: false, error: String(e) }; }
+}
+
+/**
+ * Admin: quita la asignación. RLS bloquea a no-admin.
+ */
+export async function removeProfessionalFromStudent(
+  studentId: string,
+  professionalId: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { error } = await supabase
+      .from("student_professionals")
+      .delete()
+      .eq("student_id", studentId)
+      .eq("professional_id", professionalId);
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (e) { return { success: false, error: String(e) }; }
+}

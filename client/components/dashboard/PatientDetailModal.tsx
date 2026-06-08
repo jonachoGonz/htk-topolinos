@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
-import { X, StickyNote, Pause, Play, Trash2, Pin, Plus, Loader2, ClipboardList, AlertTriangle, LineChart } from "lucide-react";
+import { X, StickyNote, Pause, Play, Trash2, Pin, Plus, Loader2, ClipboardList, AlertTriangle, LineChart, Briefcase } from "lucide-react";
 import { toast } from "sonner";
 import {
   getPatient, getPatientNotes, addPatientNote, deletePatientNote,
   setPatientPause, getPatientAttendance,
+  getAllPatients, listProfessionalsForStudent,
+  assignProfessionalToStudent, removeProfessionalFromStudent,
   type PatientNote, type PatientAttendance, type PatientProfile,
 } from "@/services/supabase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,7 +21,7 @@ interface PatientDetailModalProps {
   onChanged: () => void;
 }
 
-type Tab = "form" | "notes" | "attendance" | "evaluations" | "pause";
+type Tab = "form" | "notes" | "attendance" | "evaluations" | "professionals" | "pause";
 
 const CRITICAL_KEYS = new Set([
   "diabetes_t1", "epilepsia", "cardio", "marcapasos", "embarazo", "cancer",
@@ -102,6 +104,11 @@ export default function PatientDetailModal({
             <LineChart className="w-3.5 h-3.5" /> Evaluaciones
           </TabBtn>
           {isAdmin && (
+            <TabBtn active={tab === "professionals"} onClick={() => setTab("professionals")}>
+              <Briefcase className="w-3.5 h-3.5" /> Profesionales
+            </TabBtn>
+          )}
+          {isAdmin && (
             <TabBtn active={tab === "pause"} onClick={() => setTab("pause")}>
               {isPaused ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />} {isPaused ? "Reanudar" : "Pausar"}
             </TabBtn>
@@ -114,6 +121,7 @@ export default function PatientDetailModal({
           {tab === "notes" && <NotesPanel patientId={patientId} />}
           {tab === "attendance" && <AttendancePanel patientId={patientId} />}
           {tab === "evaluations" && <EvaluationsPanel patientId={patientId} />}
+          {tab === "professionals" && isAdmin && <ProfessionalsPanel patientId={patientId} />}
           {tab === "pause" && (
             <PausePanel patientId={patientId} isPaused={isPaused} onChanged={() => { onChanged(); onClose(); }} />
           )}
@@ -302,6 +310,164 @@ function PausePanel({ patientId, isPaused, onChanged }: { patientId: string; isP
           : isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
         {isPaused ? "Reanudar paciente" : "Pausar paciente"}
       </button>
+    </div>
+  );
+}
+
+// =============================================================
+// Professionals panel (admin: asignar/quitar profesionales al alumno)
+// =============================================================
+function ProfessionalsPanel({ patientId }: { patientId: string }) {
+  const [assigned, setAssigned] = useState<Array<{
+    professional_id: string;
+    full_name?: string;
+    professional_type?: string | null;
+    assigned_at: string;
+  }>>([]);
+  const [allTeachers, setAllTeachers] = useState<PatientProfile[]>([]);
+  const [selectedId, setSelectedId] = useState<string>("");
+  const [loading, setLoading] = useState(true);
+  const [acting, setActing] = useState<string | null>(null);
+
+  const refresh = async () => {
+    setLoading(true);
+    const [aRes, tRes] = await Promise.all([
+      listProfessionalsForStudent(patientId),
+      getAllPatients("teacher"),
+    ]);
+    if (aRes.success) setAssigned(aRes.data || []);
+    if (tRes.success) setAllTeachers(tRes.data || []);
+    setLoading(false);
+  };
+
+  useEffect(() => { refresh(); }, [patientId]);
+
+  const assignedIds = new Set(assigned.map((a) => a.professional_id));
+  const available = allTeachers.filter((t) => !assignedIds.has(t.id));
+
+  const handleAssign = async () => {
+    if (!selectedId) return;
+    setActing(selectedId);
+    const tpl = allTeachers.find((t) => t.id === selectedId);
+    const r = await assignProfessionalToStudent(
+      patientId,
+      selectedId,
+      tpl?.professional_type || null,
+    );
+    if (r.success) { toast.success("Profesional asignado"); setSelectedId(""); await refresh(); }
+    else toast.error(`Error: ${r.error}`);
+    setActing(null);
+  };
+
+  const handleRemove = async (professionalId: string) => {
+    if (!confirm("¿Quitar este profesional del alumno?")) return;
+    setActing(professionalId);
+    const r = await removeProfessionalFromStudent(patientId, professionalId);
+    if (r.success) { toast.success("Asignación removida"); await refresh(); }
+    else toast.error(`Error: ${r.error}`);
+    setActing(null);
+  };
+
+  const TYPE_LABEL: Record<string, string> = {
+    kinesiologist: "Kinesiología",
+    nutritionist: "Nutrición",
+    therapist: "Terapia",
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8 text-gray-500">
+        <Loader2 className="w-5 h-5 animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h3 className="text-white font-semibold font-lexend text-sm mb-1">
+          Profesionales asignados
+        </h3>
+        <p className="text-xs text-gray-500">
+          Determina qué profesionales pueden ver y administrar a este alumno.
+        </p>
+      </div>
+
+      {assigned.length === 0 ? (
+        <p className="text-gray-500 text-sm py-4 text-center bg-white/[0.02] rounded-lg border border-white/[0.04]">
+          Sin profesionales asignados. El alumno no aparecerá en la lista de ningún profesional hasta que se le asigne uno.
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {assigned.map((a) => (
+            <li
+              key={a.professional_id}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-[#0f131a] border border-white/[0.06]"
+            >
+              <Briefcase className="w-4 h-4 text-emerald-300 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-white text-sm font-medium truncate">{a.full_name || "Profesional"}</p>
+                {a.professional_type && (
+                  <p className="text-[10px] uppercase tracking-wider text-gray-500 mt-0.5">
+                    {TYPE_LABEL[a.professional_type] || a.professional_type}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => handleRemove(a.professional_id)}
+                disabled={acting === a.professional_id}
+                className="p-1.5 rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition disabled:opacity-40"
+                title="Quitar asignación"
+              >
+                {acting === a.professional_id
+                  ? <Loader2 className="w-4 h-4 animate-spin" />
+                  : <X className="w-4 h-4" />}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="pt-2 border-t border-white/[0.04]">
+        <label className="block text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-1.5">
+          Agregar profesional
+        </label>
+        <div className="flex gap-2">
+          <select
+            value={selectedId}
+            onChange={(e) => setSelectedId(e.target.value)}
+            disabled={available.length === 0}
+            className="flex-1 bg-[#05050A] border border-white/10 rounded-lg px-3 py-2 text-sm text-white min-h-[40px]"
+          >
+            <option value="">
+              {available.length === 0
+                ? "Todos los profesionales ya están asignados"
+                : "— Selecciona un profesional —"}
+            </option>
+            {available.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.full_name}
+                {t.professional_type ? ` · ${TYPE_LABEL[t.professional_type] || t.professional_type}` : ""}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={handleAssign}
+            disabled={!selectedId || !!acting}
+            className="px-4 rounded-lg bg-[#00d4ff] hover:bg-cyan-300 text-[#05050A] font-bold text-sm disabled:opacity-40 transition flex items-center gap-1.5 min-h-[40px]"
+          >
+            {acting === selectedId
+              ? <Loader2 className="w-4 h-4 animate-spin" />
+              : <Plus className="w-4 h-4" />}
+            Asignar
+          </button>
+        </div>
+        {available.length === 0 && allTeachers.length === 0 && (
+          <p className="text-[11px] text-gray-500 mt-2">
+            Aún no hay profesionales en el sistema. Créalos desde Administración → Profesionales.
+          </p>
+        )}
+      </div>
     </div>
   );
 }

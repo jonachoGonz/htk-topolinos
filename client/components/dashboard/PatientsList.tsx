@@ -8,6 +8,7 @@ import {
   deletePatient,
   computeAge,
   adminCreatePatient,
+  listAssignedStudentIds,
   type PatientProfile,
   type PatientAttendance,
 } from "@/services/supabase";
@@ -65,7 +66,7 @@ export default function PatientsList({ roleFilter = "student" }: PatientsListPro
     role: roleFilter as "student" | "teacher",
   });
   const [creating, setCreating] = useState(false);
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
 
   const isTeacherView = roleFilter === "teacher";
   const entityLabel = isTeacherView ? "profesional" : "paciente";
@@ -73,13 +74,25 @@ export default function PatientsList({ roleFilter = "student" }: PatientsListPro
 
   const fetchAll = async () => {
     setLoading(true);
-    // Solo cargamos asistencia para el listado de alumnos; los profesionales
-    // no la usan.
+    // Solo cargamos asistencia para el listado de alumnos.
     const requests: Promise<any>[] = [getAllPatients(roleFilter)];
     if (!isTeacherView) requests.push(getAllPatientsAttendance());
     const [pRes, aRes] = await Promise.all(requests);
-    if (pRes.success) setPatients(pRes.data || []);
-    else toast.error(`Error: ${pRes.error}`);
+
+    let patientsData = pRes.success ? pRes.data || [] : [];
+
+    // Profesor NO admin viendo el listado de alumnos: filtrar a sus
+    // asignados (M2M student_professionals). Admin ve todos.
+    if (!isAdmin && roleFilter === "student" && user?.id) {
+      const assignRes = await listAssignedStudentIds(user.id);
+      if (assignRes.success) {
+        const allowed = new Set(assignRes.data || []);
+        patientsData = patientsData.filter((p) => allowed.has(p.id));
+      }
+    }
+
+    setPatients(patientsData);
+    if (!pRes.success) toast.error(`Error: ${pRes.error}`);
     if (!isTeacherView && aRes?.success) {
       const map: Record<string, PatientAttendance> = {};
       (aRes.data || []).forEach((s: PatientAttendance) => (map[s.patient_id] = s));
@@ -88,7 +101,7 @@ export default function PatientsList({ roleFilter = "student" }: PatientsListPro
     setLoading(false);
   };
 
-  useEffect(() => { fetchAll(); /* eslint-disable-next-line */ }, [roleFilter]);
+  useEffect(() => { fetchAll(); /* eslint-disable-next-line */ }, [roleFilter, user?.id, isAdmin]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
