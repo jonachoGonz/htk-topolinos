@@ -12,6 +12,7 @@ import {
   type PatientAttendance,
 } from "@/services/supabase";
 import PatientDetailModal from "./PatientDetailModal";
+import TeacherDetailModal from "./TeacherDetailModal";
 
 interface PatientsListProps {
   professionalId?: string;
@@ -166,10 +167,13 @@ export default function PatientsList({ roleFilter = "student" }: PatientsListPro
       {isAdmin && (
         <div className="flex justify-end">
           <button
-            onClick={() => setCreateModalOpen(true)}
+            onClick={() => {
+              setCreateForm((f) => ({ ...f, role: roleFilter }));
+              setCreateModalOpen(true);
+            }}
             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#00d4ff] hover:bg-cyan-300 text-[#05050A] text-sm font-bold transition"
           >
-            <UserPlus className="w-4 h-4" /> Crear paciente
+            <UserPlus className="w-4 h-4" /> Crear {entityLabel}
           </button>
         </div>
       )}
@@ -295,7 +299,14 @@ export default function PatientsList({ roleFilter = "student" }: PatientsListPro
         </div>
       )}
 
-      {selected && (
+      {selected && isTeacherView && (
+        <TeacherDetailModal
+          teacherId={selected.id}
+          teacherName={selected.full_name || "Profesional"}
+          onClose={() => { setSelected(null); fetchAll(); }}
+        />
+      )}
+      {selected && !isTeacherView && (
         <PatientDetailModal
           patientId={selected.id}
           patientName={selected.full_name || "Paciente"}
