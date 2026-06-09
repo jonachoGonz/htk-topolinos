@@ -1,10 +1,11 @@
 import { CircleCheck } from "lucide-react";
 
+// Diferenciales reales — sin números inflados.
 const stats = [
-  { label: "Atletas Entrenados", value: "500+" },
-  { label: "Deportes Cubiertos", value: "15+" },
-  { label: "Tasa de Recuperación", value: "98%" },
-  { label: "Atención y Servicios", value: "24/7" },
+  { label: "Atención", value: "1:1" },
+  { label: "Adaptamos a tu deporte", value: "Tu meta" },
+  { label: "Plan personalizado", value: "Tu ritmo" },
+  { label: "L–V 07–22h · Sáb 09–18h", value: "Horario" },
 ];
 
 const facilities = [
@@ -65,7 +66,7 @@ export default function About() {
               <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-[#0f1420] to-transparent" />
               <div className="absolute bottom-5 left-5 right-5 flex items-center justify-between">
                 <span className="htk-chip backdrop-blur-md bg-black/30">
-                  Más de 8 años
+                  Atención cercana
                 </span>
                 <span className="text-[10px] uppercase tracking-[0.18em] text-gray-300">
                   Santiago · Chile
@@ -76,24 +77,25 @@ export default function About() {
             {/* Content */}
             <div>
               <h2 className="htk-h2 text-white mb-6">
-                La precisión clínica
+                Foco en cada persona,
                 <br />
-                <span className="text-cyan-400">al servicio del deporte.</span>
+                <span className="text-cyan-400">no en el promedio.</span>
               </h2>
               <p className="htk-body mb-8">
-                En HTK Center se unen intervención clínica, optimización y
-                entrenamiento integrado. Nuestro equipo multidisciplinario
-                combina las tecnologías de última generación con protocolos
-                científicos para maximizar el rendimiento deportivo sin dejar
-                de lado el aspecto clínico del deporte y atletas.
+                HTK Center es un centro pequeño donde tu profesional te conoce
+                por nombre. Trabajamos con un equipo multidisciplinario
+                (kinesiología, nutrición y entrenamiento) para que avances a
+                tu propio ritmo y cumplas tus objetivos personales. Estamos
+                creciendo, y nuestro foco está en lo que importa: tu
+                recuperación y tu progreso.
               </p>
 
               {/* Features List */}
               <div className="space-y-3">
                 {[
-                  "Tecnología de kinesiología avanzada",
-                  "Atención técnica de alto performance",
-                  "Equipo clínico y científico especializado",
+                  "Equipo multidisciplinario: kinesiología, nutrición y entrenamiento",
+                  "Atención cercana, sin grupos masivos",
+                  "Plan adaptado a tu deporte y tu nivel",
                 ].map((f) => (
                   <div key={f} className="flex items-start gap-3">
                     <CircleCheck className="w-5 h-5 text-cyan-400 flex-shrink-0 mt-0.5" />

@@ -1,10 +1,13 @@
-import { Star, Users, Dumbbell, Trophy, Clock, ChevronDown, ArrowRight } from "lucide-react";
+import { Star, Heart, Activity, Target, Clock, ChevronDown, ArrowRight } from "lucide-react";
 
+// Diferenciales reales del centro — los números inflados (500+ atletas,
+// 98% recuperación, 24/7) se sacaron porque no aplican: el centro es
+// pequeño, recién iniciando, con foco en cercanía y plan personalizado.
 const stats = [
-  { icon: Users, value: "500+", label: "Atletas entrenados" },
-  { icon: Dumbbell, value: "15+", label: "Deportes cubiertos" },
-  { icon: Trophy, value: "98%", label: "Tasa de recuperación" },
-  { icon: Clock, value: "24/7", label: "Atención continua" },
+  { icon: Heart,    value: "1 a 1",     label: "Atención personalizada" },
+  { icon: Activity, value: "Tu deporte", label: "Adaptable a tu disciplina" },
+  { icon: Target,   value: "Tu meta",    label: "Plan según tus objetivos" },
+  { icon: Clock,    value: "L–V · 7–22h", label: "Sáb 09–18h" },
 ];
 
 // Editorial-grade Unsplash photos (replaceable with real shots later).

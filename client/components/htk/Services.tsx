@@ -4,7 +4,7 @@ const services = [
   {
     title: "Evaluación Biomecánica",
     description:
-      "Análisis preciso del movimiento para prevenir lesiones y optimizar el rendimiento deportivo.",
+      "Evaluamos tu movimiento según tus necesidades para prevenir lesiones y orientar tu plan de trabajo.",
     icon: Heart,
     tag: "Diagnóstico",
     image:
@@ -13,7 +13,7 @@ const services = [
   {
     title: "Preparación Física",
     description:
-      "Programas personalizados basados en evidencia científica con un enfoque individualizado.",
+      "Programas personalizados según tu deporte, tu nivel y los objetivos que tú definas.",
     icon: Activity,
     tag: "Entrenamiento",
     image:
@@ -22,7 +22,7 @@ const services = [
   {
     title: "Kinesiología Deportiva",
     description:
-      "Recuperación funcional avanzada con tecnologías de última generación.",
+      "Recuperación funcional con seguimiento cercano y un plan que se adapta a tu evolución.",
     icon: Brain,
     tag: "Recuperación",
     image:
