@@ -127,6 +127,20 @@ export const handler: Handler = async (event) => {
       }
     }
 
+    // socio_number autogenerado solo para alumnos (no profesores). Formato
+    // HTKTOP-001, HTKTOP-002... vía secuencia Postgres. Los alumnos migrados
+    // del centro anterior se reasignan manualmente al prefijo HTK- después,
+    // fuera de este flujo.
+    let socioNumber: string | null = null;
+    if (role === "student") {
+      const { data: socioData, error: socioErr } = await sb.rpc("next_socio_number");
+      if (socioErr) {
+        console.error("admin-create-patient: next_socio_number failed", socioErr);
+      } else {
+        socioNumber = socioData as string;
+      }
+    }
+
     // Upsert profile (trigger may have already created it; we ensure all fields)
     await sb.from("profiles").upsert(
       {
@@ -137,6 +151,7 @@ export const handler: Handler = async (event) => {
         rut_dni: rut_dni || null,
         role,
         is_admin: false,
+        ...(socioNumber ? { socio_number: socioNumber } : {}),
       },
       { onConflict: "id" }
     );
