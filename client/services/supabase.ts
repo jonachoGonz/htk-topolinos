@@ -1,5 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 import type { User, Session } from "@supabase/supabase-js";
+import type {
+  Skinfolds, Habits, MaxHrZones, PainAssessment, EvaluationObjectives,
+} from "@/lib/evaluations";
 
 /**
  * Supabase Client - HTK Center
@@ -1696,8 +1699,6 @@ export async function getProfessionalsDirectory(): Promise<{
 // ============================================
 
 export type Handedness = "diestro" | "zurdo" | "ambidiestro";
-export type ActivityLevel =
-  | "sedentario" | "ligero" | "moderado" | "activo" | "muy_activo" | "atleta";
 export type BloodType =
   | "A+" | "A-" | "B+" | "B-" | "AB+" | "AB-" | "O+" | "O-";
 export type MaritalStatus =
@@ -1735,27 +1736,16 @@ export interface PatientProfile {
   profession?: string;
   occupation?: string;
   photo_url?: string;
-  height_cm?: number;
-  weight_kg?: number;
-  body_fat_pct?: number;
-  muscle_mass_pct?: number;
-  bone_mass_pct?: number;
-  // Body measurements (circumferences)
-  waist_cm?: number;
-  hip_cm?: number;
-  chest_cm?: number;
-  arm_cm?: number;
-  thigh_cm?: number;
-  calf_cm?: number;
+  socio_number?: string;
+  social_media_handle?: string;
   // PAR-Q
   parq_completed_at?: string;
   parq_answers?: Record<string, boolean>;
   parq_cleared?: boolean;
   parq_clearance_notes?: string;
-  activity_level?: ActivityLevel | string;
-  objective?: string;
   handedness?: Handedness | string;
   blood_type?: BloodType | string;
+  health_center?: string;
   allergies?: string;
   diseases?: string[];
   surgeries?: string;
@@ -1773,6 +1763,7 @@ export interface PatientProfile {
   joined_at?: string;
   referral_source?: string;
   informed_consent_signed?: boolean;
+  social_media_consent?: boolean;
   is_paused?: boolean;
   paused_at?: string;
   pause_reason?: string;
@@ -1785,15 +1776,14 @@ export interface PatientProfile {
 const PATIENT_FIELDS = `
   id, full_name, email, rut_dni, birth_date, gender, marital_status,
   has_children, num_children, phone, address, profession, occupation, photo_url,
-  height_cm, weight_kg, body_fat_pct, muscle_mass_pct, bone_mass_pct,
-  waist_cm, hip_cm, chest_cm, arm_cm, thigh_cm, calf_cm,
+  socio_number, social_media_handle,
   parq_completed_at, parq_answers, parq_cleared, parq_clearance_notes,
-  activity_level, objective, handedness,
-  blood_type, allergies, diseases, surgeries, ailments, injuries,
+  handedness,
+  blood_type, health_center, allergies, diseases, surgeries, ailments, injuries,
   sports, drugs, medications,
   emergency_contact_name, emergency_contact_phone, emergency_contact_relation,
   medical_info_extra, personal_info_extra,
-  insurer, joined_at, referral_source, informed_consent_signed,
+  insurer, joined_at, referral_source, informed_consent_signed, social_media_consent,
   is_paused, paused_at, pause_reason, pause_resume_at,
   role, is_admin, professional_type
 `;
@@ -2448,6 +2438,7 @@ export interface BodyEvaluation {
   patient_id: string;
   professional_id?: string | null;
   measured_at: string;       // YYYY-MM-DD
+  height_cm?: number | null;
   weight_kg?: number | null;
   body_fat_pct?: number | null;
   muscle_mass_pct?: number | null;
@@ -2458,6 +2449,19 @@ export interface BodyEvaluation {
   arm_cm?: number | null;
   thigh_cm?: number | null;
   calf_cm?: number | null;
+  neck_cm?: number | null;
+  shoulders_cm?: number | null;
+  skinfolds?: Skinfolds | null;
+  resting_heart_rate?: number | null;
+  blood_pressure_systolic?: number | null;
+  blood_pressure_diastolic?: number | null;
+  max_hr_zones?: MaxHrZones | null;
+  habits?: Habits | null;
+  pain_assessment?: PainAssessment | null;
+  rom_notes?: string | null;
+  strength_notes?: string | null;
+  findings?: string | null;
+  objectives?: EvaluationObjectives | null;
   notes?: string | null;
   created_at: string;
 }
