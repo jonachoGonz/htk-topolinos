@@ -145,3 +145,87 @@ Al finalizar la implementación se ejecutará `/design-critique` sobre las panta
 nuevas/modificadas (`PatientForm.tsx`, `EvaluationsPanel.tsx`, vista de progreso) y,
 si la crítica encuentra problemas de usabilidad relevantes, se pasa por
 `/frontend-design` para pulir antes de cerrar el trabajo.
+
+## Addendum (2026-06-21) — feedback de revisión sobre el worktree
+
+Tras levantar el worktree localmente, el usuario revisó la implementación y pidió los
+siguientes ajustes. Se mantienen todas las decisiones de arquitectura anteriores (única
+fuente de verdad en `body_evaluations` para datos que cambian mes a mes); estos cambios
+son refinamientos, no un cambio de rumbo.
+
+### Fixes de UI en `PatientForm.tsx`
+- "Hijos": el checkbox "Sí" se corta de línea por ancho insuficiente — corregir layout.
+  El input numérico de cantidad pasa a tener label propio "Número de hijos" (hoy no tiene
+  label visible, solo aparece junto al checkbox).
+- Quitar el campo "URL Foto (opcional)" de "Información adicional" — es redundante con
+  `PhotoUploader`, que ya gestiona `photo_url`.
+- `RepeatRows` (usado en Deportes, Medicamentos, Drogas): el botón de eliminar (X) debe
+  quedar siempre en la misma fila que los campos en desktop. En mobile es aceptable que
+  quede debajo. Fix: envolver los campos en su propio contenedor `flex-wrap` dentro de un
+  flex-row externo `items-start` que NO hace wrap del botón X (`shrink-0`), así el X
+  siempre queda anclado al inicio de la fila sin importar cuántas líneas ocupen los campos.
+
+### Campos nuevos en `PatientForm.tsx`
+- **Edad**: agregar como campo propio, de solo lectura (`disabled`), calculado desde
+  `birth_date` vía `computeAge()` (ya existe). Reemplaza el sufijo "(X años)" que hoy va
+  pegado al label de "Fecha de nacimiento".
+- **Fecha de ingreso**: agregar input de fecha editable enlazado a `profiles.joined_at`
+  (columna que ya existe, pero no estaba expuesta en el formulario). Default: fecha de hoy
+  si el perfil no trae una.
+- **Enfermedades / condiciones**: agregar opción "Otra" al final del grid de checkboxes.
+  Al marcarla, aparece un campo de texto libre enlazado a la nueva columna
+  `diseases_other`.
+- **Contacto de emergencia**: pasa de 3 campos planos (nombre/teléfono/relación) a una
+  lista de 1+ contactos (mismo patrón `RepeatRows` que Deportes), respaldada por la nueva
+  columna `emergency_contacts` (jsonb array de `{name, phone, relation}`).
+- **Dirección**: se separa en 3 campos — Dirección (calle), N° casa/depto, Comuna.
+  `address` sigue siendo la calle; se agregan `address_number` y `comuna`.
+- **N° de socio**: pasa de texto libre editable a autogenerado, de solo lectura pero
+  copiable (botón de copiar al portapapeles). Se genera en el servidor
+  (`admin-create-patient.ts`) al crear un alumno nuevo, formato `HTKTOP-001`,
+  `HTKTOP-002`, ... vía una secuencia Postgres + función `next_socio_number()`. Los
+  alumnos migrados del centro anterior usan el prefijo `HTK-` — esa reasignación de
+  prefijo para casos puntuales se hace manualmente más adelante (fuera de la UI, fuera de
+  alcance de este ítem).
+- **Consentimiento de datos personales**: se reemplaza el checkbox genérico
+  "Consentimiento informado / Firmado" por: un link a un documento externo (URL la
+  entrega el usuario más adelante; se deja una constante `DATA_CONSENT_DOCUMENT_URL`
+  placeholder fácil de reemplazar) + el checkbox con texto "Acepto el tratamiento de mis
+  datos personales", alineado a la normativa de protección de datos personales.
+
+### Evaluación inicial opcional (nuevo, en `PatientForm.tsx`)
+El usuario quiere poder capturar hábitos/vitales/kinésica/composición corporal **en el
+momento de crear/editar** al alumno, porque a veces el alta se hace a mitad de una
+evaluación presencial — pero sin que sea obligatorio. Diseño:
+- Nueva sección colapsable "Evaluación inicial (opcional)" en `PatientForm.tsx`, con
+  exactamente los mismos campos que el formulario "Nueva evaluación" de
+  `EvaluationsPanel.tsx` (antropometría, pliegues, vitales, hábitos, dolor, kinésica,
+  objetivos).
+- Para evitar duplicar ~300 líneas de JSX entre los dos formularios, se extrae a
+  `client/components/dashboard/BodyEvaluationFields.tsx`: el estado vacío
+  (`EMPTY_BODY_EVAL_FORM`), el componente de campos (`<BodyEvaluationFormFields
+  form={form} onChange={setForm} />`), una función pura `buildBodyEvaluationPayload(form)`
+  que aplica la misma lógica de "no persistir grupos vacíos" ya implementada, y los
+  helpers `HabitField`/`TextField`/`Field`. `EvaluationsPanel.tsx` se refactoriza para
+  consumir este módulo compartido (sin cambio de comportamiento).
+- Si al guardar el perfil el profesional dejó algo lleno en esta sección (cualquier campo
+  distinto del valor por defecto, sin contar la fecha), `PatientForm.tsx` también llama a
+  `createBodyEvaluation` con `measured_at` = la fecha elegida en esa sección (default hoy)
+  y `professional_id` = el usuario admin/profesor logueado — creando una fila real en el
+  historial, nunca un campo estático nuevo en `profiles`.
+
+### Migración 025 — datos
+- `profiles`: agregar `address_number`, `comuna`, `emergency_contacts` (jsonb),
+  `diseases_other` (text).
+- `profiles`: migrar la única fila existente con `emergency_contact_name` no vacío
+  (verificado en vivo: 1 de 6 perfiles) a `emergency_contacts` antes de eliminar las 3
+  columnas viejas (`emergency_contact_name/phone/relation`).
+- Nueva secuencia `socio_number_seq` + función `next_socio_number()` (`SECURITY` definer
+  no necesario, función simple que envuelve `nextval`), usada por
+  `admin-create-patient.ts` solo cuando `role = 'student'`.
+
+### Fuera de alcance de este addendum
+- Migrar el formulario de creación/edición de modal a página completa con tabs — queda
+  como conversación de diseño aparte, después de cerrar estos fixes.
+- Reasignar manualmente los prefijos `HTK-` vs `HTKTOP-` de alumnos específicos — lo
+  resuelve el usuario directamente con Claude más adelante, no es trabajo de UI.
