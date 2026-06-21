@@ -1721,6 +1721,12 @@ export interface MedicationEntry {
   since?: string;
 }
 
+export interface EmergencyContact {
+  name: string;
+  phone?: string;
+  relation?: string;
+}
+
 export interface PatientProfile {
   id: string;
   full_name: string;
@@ -1733,6 +1739,8 @@ export interface PatientProfile {
   num_children?: number;
   phone?: string;
   address?: string;
+  address_number?: string;
+  comuna?: string;
   profession?: string;
   occupation?: string;
   photo_url?: string;
@@ -1748,15 +1756,14 @@ export interface PatientProfile {
   health_center?: string;
   allergies?: string;
   diseases?: string[];
+  diseases_other?: string;
   surgeries?: string;
   ailments?: string;
   injuries?: string;
   sports?: SportEntry[];
   drugs?: SubstanceEntry[];
   medications?: MedicationEntry[];
-  emergency_contact_name?: string;
-  emergency_contact_phone?: string;
-  emergency_contact_relation?: string;
+  emergency_contacts?: EmergencyContact[];
   medical_info_extra?: string;
   personal_info_extra?: string;
   insurer?: string;
@@ -1775,13 +1782,13 @@ export interface PatientProfile {
 
 const PATIENT_FIELDS = `
   id, full_name, email, rut_dni, birth_date, gender, marital_status,
-  has_children, num_children, phone, address, profession, occupation, photo_url,
+  has_children, num_children, phone, address, address_number, comuna, profession, occupation, photo_url,
   socio_number, social_media_handle,
   parq_completed_at, parq_answers, parq_cleared, parq_clearance_notes,
   handedness,
-  blood_type, health_center, allergies, diseases, surgeries, ailments, injuries,
+  blood_type, health_center, allergies, diseases, diseases_other, surgeries, ailments, injuries,
   sports, drugs, medications,
-  emergency_contact_name, emergency_contact_phone, emergency_contact_relation,
+  emergency_contacts,
   medical_info_extra, personal_info_extra,
   insurer, joined_at, referral_source, informed_consent_signed, social_media_consent,
   is_paused, paused_at, pause_reason, pause_resume_at,
