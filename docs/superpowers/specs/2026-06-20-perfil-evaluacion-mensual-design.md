@@ -87,7 +87,7 @@ nunca desde `profiles`.
 **Columnas JSONB nuevas** (mismo patrón que `parq_answers`/`diseases` en `profiles`):
 | Columna | Forma |
 |---|---|
-| `skinfolds` | `{bicipital, tricipital, subescapular, abdominal, suprailiaco, thigh, leg, sum}` (mm; `sum` calculado client-side) |
+| `skinfolds` | `{bicipital, tricipital, subescapular, abdominal, suprailiaco, thigh, leg}` (mm). La sumatoria NO se persiste como campo — se calcula en el cliente vía `computeSkinfoldSum()` cada vez que se necesita, para que nunca quede desincronizada si se edita un pliegue individual. |
 | `habits` | `{smoking: {level, count}, alcohol: {level, count}, physical_activity: {level, count}, nutrition: {level}, hydration: {level}, rest: {level, hours}}` — `level` es uno de `no/a_veces/a_menudo/siempre` para hábitos de riesgo, o `malo/regular/bueno/excelente` para alimentación/hidratación/descanso |
 | `max_hr_zones` | `{pct50, pct60, pct70, pct80, pct90, pct100}` (bpm) |
 | `pain_assessment` | mnemónico ALICIA del formulario original: `{onset, location, radiation, character, intensity_0_10, aggravating}` |
