@@ -142,7 +142,7 @@ export const handler: Handler = async (event) => {
     }
 
     // Upsert profile (trigger may have already created it; we ensure all fields)
-    await sb.from("profiles").upsert(
+    const { error: upsertErr } = await sb.from("profiles").upsert(
       {
         id: userId,
         full_name,
@@ -155,6 +155,10 @@ export const handler: Handler = async (event) => {
       },
       { onConflict: "id" }
     );
+    if (upsertErr) {
+      console.error("admin-create-patient: profile upsert failed", upsertErr);
+      return { statusCode: 500, body: JSON.stringify({ error: upsertErr.message }) };
+    }
 
     // Email confirmation when admin sets the password directly
     if (!send_invite && password) {
