@@ -5,8 +5,6 @@ import {
   getPatient,
   updatePatient,
   computeAge,
-  computeBMI,
-  bmiCategory,
   type PatientProfile,
   type SportEntry,
   type SubstanceEntry,
@@ -69,15 +67,11 @@ const EMPTY: Partial<PatientProfile> = {
   address: "",
   profession: "",
   occupation: "",
-  height_cm: undefined,
-  weight_kg: undefined,
-  body_fat_pct: undefined,
-  muscle_mass_pct: undefined,
-  bone_mass_pct: undefined,
-  activity_level: "",
-  objective: "",
+  socio_number: "",
+  social_media_handle: "",
   handedness: "",
   blood_type: "",
+  health_center: "",
   allergies: "",
   diseases: [],
   surgeries: "",
@@ -94,11 +88,11 @@ const EMPTY: Partial<PatientProfile> = {
   insurer: "",
   referral_source: "",
   informed_consent_signed: false,
+  social_media_consent: false,
 };
 
 type SectionId =
-  | "photo" | "personal" | "professional" | "body" | "measurements"
-  | "goals" | "parq" | "medical"
+  | "photo" | "personal" | "contact" | "professional" | "parq" | "medical"
   | "conditions" | "sports" | "substances" | "emergency" | "extra" | "admin";
 
 export default function PatientForm({ patientId, onSaved, onCancel }: PatientFormProps) {
@@ -106,8 +100,8 @@ export default function PatientForm({ patientId, onSaved, onCancel }: PatientFor
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [open, setOpen] = useState<Record<SectionId, boolean>>({
-    photo: true, personal: true, professional: false, body: false,
-    measurements: false, goals: false, parq: false, medical: false,
+    photo: true, personal: true, contact: true, professional: false,
+    parq: false, medical: false,
     conditions: false, sports: false, substances: false,
     emergency: false, extra: false, admin: false,
   });
@@ -129,7 +123,6 @@ export default function PatientForm({ patientId, onSaved, onCancel }: PatientFor
   const toggle = (id: SectionId) => setOpen((o) => ({ ...o, [id]: !o[id] }));
 
   const age = computeAge(form.birth_date as string | undefined);
-  const bmi = computeBMI(form.height_cm as number, form.weight_kg as number);
 
   const rutValid = !form.rut_dni || isValidRut(form.rut_dni);
 
@@ -246,8 +239,7 @@ export default function PatientForm({ patientId, onSaved, onCancel }: PatientFor
               <p className="text-[10px] text-emerald-400 mt-1">RUT válido ✓</p>
             )}
           </Field>
-          <Field label="Email"><Input type="email" value={form.email || ""} onChange={(v) => set("email", v)} /></Field>
-          <Field label="Teléfono"><Input value={form.phone || ""} onChange={(v) => set("phone", v)} /></Field>
+          <Field label="N° de socio"><Input value={form.socio_number || ""} onChange={(v) => set("socio_number", v)} /></Field>
           <Field label={`Fecha de nacimiento ${age != null ? `(${age} años)` : ""}`}>
             <Input type="date" value={form.birth_date || ""} onChange={(v) => set("birth_date", v)} />
           </Field>
@@ -272,7 +264,19 @@ export default function PatientForm({ patientId, onSaved, onCancel }: PatientFor
               )}
             </div>
           </Field>
+          <Field label="Lateralidad">
+            <Select value={form.handedness || ""} onChange={(v) => set("handedness", v as any)}
+              options={[["", "—"], ["diestro", "Diestro"], ["zurdo", "Zurdo"], ["ambidiestro", "Ambidiestro"]]} />
+          </Field>
+        </Grid>
+      </Section>
+
+      <Section id="contact" title="Contacto" open={open.contact} onToggle={toggle}>
+        <Grid>
+          <Field label="Email"><Input type="email" value={form.email || ""} onChange={(v) => set("email", v)} /></Field>
+          <Field label="Teléfono"><Input value={form.phone || ""} onChange={(v) => set("phone", v)} /></Field>
           <Field label="Dirección" full><Input value={form.address || ""} onChange={(v) => set("address", v)} /></Field>
+          <Field label="@Redes sociales"><Input value={form.social_media_handle || ""} onChange={(v) => set("social_media_handle", v)} placeholder="@usuario" /></Field>
         </Grid>
       </Section>
 
@@ -280,57 +284,6 @@ export default function PatientForm({ patientId, onSaved, onCancel }: PatientFor
         <Grid>
           <Field label="Profesión"><Input value={form.profession || ""} onChange={(v) => set("profession", v)} /></Field>
           <Field label="Labor actual"><Input value={form.occupation || ""} onChange={(v) => set("occupation", v)} /></Field>
-        </Grid>
-      </Section>
-
-      <Section id="body" title="Composición corporal" open={open.body} onToggle={toggle}>
-        <Grid>
-          <Field label="Estatura (cm)"><Input type="number" value={String(form.height_cm ?? "")} onChange={(v) => set("height_cm", parseFloat(v) || (undefined as any))} /></Field>
-          <Field label="Peso (kg)"><Input type="number" value={String(form.weight_kg ?? "")} onChange={(v) => set("weight_kg", parseFloat(v) || (undefined as any))} /></Field>
-          <Field label={`IMC ${bmi ? `(${bmi} — ${bmiCategory(bmi)})` : ""}`}>
-            <Input value={bmi ? String(bmi) : ""} disabled />
-          </Field>
-          <Field label="Masa adiposa (%)"><Input type="number" value={String(form.body_fat_pct ?? "")} onChange={(v) => set("body_fat_pct", parseFloat(v) || (undefined as any))} /></Field>
-          <Field label="Masa muscular (%)"><Input type="number" value={String(form.muscle_mass_pct ?? "")} onChange={(v) => set("muscle_mass_pct", parseFloat(v) || (undefined as any))} /></Field>
-          <Field label="Masa ósea (%)"><Input type="number" value={String(form.bone_mass_pct ?? "")} onChange={(v) => set("bone_mass_pct", parseFloat(v) || (undefined as any))} /></Field>
-        </Grid>
-      </Section>
-
-      <Section id="measurements" title="Mediciones (circunferencias en cm)" open={open.measurements} onToggle={toggle}>
-        <Grid>
-          <Field label="Cintura"><Input type="number" value={String(form.waist_cm ?? "")} onChange={(v) => set("waist_cm", parseFloat(v) || (undefined as any))} /></Field>
-          <Field label="Cadera"><Input type="number" value={String(form.hip_cm ?? "")} onChange={(v) => set("hip_cm", parseFloat(v) || (undefined as any))} /></Field>
-          <Field label="Pecho"><Input type="number" value={String(form.chest_cm ?? "")} onChange={(v) => set("chest_cm", parseFloat(v) || (undefined as any))} /></Field>
-          <Field label="Brazo"><Input type="number" value={String(form.arm_cm ?? "")} onChange={(v) => set("arm_cm", parseFloat(v) || (undefined as any))} /></Field>
-          <Field label="Muslo"><Input type="number" value={String(form.thigh_cm ?? "")} onChange={(v) => set("thigh_cm", parseFloat(v) || (undefined as any))} /></Field>
-          <Field label="Pantorrilla"><Input type="number" value={String(form.calf_cm ?? "")} onChange={(v) => set("calf_cm", parseFloat(v) || (undefined as any))} /></Field>
-        </Grid>
-        {form.waist_cm && form.hip_cm && (
-          <p className="mt-2 text-xs text-gray-400">
-            Índice cintura/cadera:{" "}
-            <span className="text-white font-semibold">
-              {(form.waist_cm / form.hip_cm).toFixed(2)}
-            </span>
-          </p>
-        )}
-      </Section>
-
-      <Section id="goals" title="Actividad y objetivos" open={open.goals} onToggle={toggle}>
-        <Grid>
-          <Field label="Nivel de actividad física">
-            <Select value={form.activity_level || ""} onChange={(v) => set("activity_level", v as any)}
-              options={[
-                ["", "—"], ["sedentario", "Sedentario"], ["ligero", "Ligero"],
-                ["moderado", "Moderado"], ["activo", "Activo"], ["muy_activo", "Muy activo"], ["atleta", "Atleta"],
-              ]} />
-          </Field>
-          <Field label="Lateralidad">
-            <Select value={form.handedness || ""} onChange={(v) => set("handedness", v as any)}
-              options={[["", "—"], ["diestro", "Diestro"], ["zurdo", "Zurdo"], ["ambidiestro", "Ambidiestro"]]} />
-          </Field>
-          <Field label="Objetivo" full>
-            <Textarea value={form.objective || ""} onChange={(v) => set("objective", v)} rows={2} placeholder="Ej: rehabilitación post-cirugía, ganar fuerza, perder grasa…" />
-          </Field>
         </Grid>
       </Section>
 
@@ -437,6 +390,7 @@ export default function PatientForm({ patientId, onSaved, onCancel }: PatientFor
             <Select value={form.insurer || ""} onChange={(v) => set("insurer", v)}
               options={[["", "—"], ["Fonasa", "Fonasa"], ["Isapre", "Isapre"], ["Particular", "Particular"], ["Otro", "Otro"]]} />
           </Field>
+          <Field label="Centro de salud al cual acudir"><Input value={form.health_center || ""} onChange={(v) => set("health_center", v)} /></Field>
           <Field label="Alergias" full><Textarea value={form.allergies || ""} onChange={(v) => set("allergies", v)} rows={2} /></Field>
           <Field label="Cirugías" full><Textarea value={form.surgeries || ""} onChange={(v) => set("surgeries", v)} rows={2} placeholder="Tipo, fecha aprox., complicaciones..." /></Field>
           <Field label="Dolencias actuales" full><Textarea value={form.ailments || ""} onChange={(v) => set("ailments", v)} rows={2} /></Field>
@@ -534,6 +488,13 @@ export default function PatientForm({ patientId, onSaved, onCancel }: PatientFor
               <input type="checkbox" checked={!!form.informed_consent_signed}
                 onChange={(e) => set("informed_consent_signed", e.target.checked)} />
               Firmado
+            </label>
+          </Field>
+          <Field label="Consentimiento redes sociales">
+            <label className="flex items-center gap-2 text-sm text-white">
+              <input type="checkbox" checked={!!form.social_media_consent}
+                onChange={(e) => set("social_media_consent", e.target.checked)} />
+              Autoriza ser etiquetado en publicaciones
             </label>
           </Field>
         </Grid>

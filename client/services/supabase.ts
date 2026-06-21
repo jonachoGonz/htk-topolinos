@@ -2086,22 +2086,6 @@ export function computeAge(birthDate?: string): number | null {
   return Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25));
 }
 
-export function computeBMI(heightCm?: number, weightKg?: number): number | null {
-  if (!heightCm || !weightKg || heightCm <= 0) return null;
-  const m = heightCm / 100;
-  return Math.round((weightKg / (m * m)) * 10) / 10;
-}
-
-export function bmiCategory(bmi: number | null): string {
-  if (bmi === null) return "—";
-  if (bmi < 18.5) return "Bajo peso";
-  if (bmi < 25) return "Normal";
-  if (bmi < 30) return "Sobrepeso";
-  if (bmi < 35) return "Obesidad I";
-  if (bmi < 40) return "Obesidad II";
-  return "Obesidad III";
-}
-
 // ============================================
 // PLAN TEMPLATES (ADMIN)
 // ============================================
