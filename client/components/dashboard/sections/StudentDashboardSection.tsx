@@ -616,6 +616,24 @@ function BodyEvaluationSection({ items }: { items: BodyEvaluation[] }) {
               </span>
             </div>
           )}
+
+          {latest.objectives && (latest.objectives.general || latest.objectives.specific_1) && (
+            <div className="px-3 py-3 rounded-lg bg-white/[0.03] border border-white/[0.06]">
+              <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">
+                Objetivos vigentes (desde {latest.measured_at})
+              </p>
+              <ul className="space-y-1 text-xs text-white/90 list-disc pl-4">
+                {[latest.objectives.specific_1, latest.objectives.specific_2, latest.objectives.specific_3]
+                  .filter(Boolean)
+                  .map((o, i) => <li key={i}>{o}</li>)}
+              </ul>
+              {latest.objectives.general && (
+                <p className="text-xs text-gray-400 mt-2">
+                  <span className="text-gray-500">General:</span> {latest.objectives.general}
+                </p>
+              )}
+            </div>
+          )}
         </div>
       )}
     </section>
