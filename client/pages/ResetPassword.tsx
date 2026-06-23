@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { Lock, ArrowRight, ShieldCheck, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/services/supabase";
@@ -89,8 +89,8 @@ export default function ResetPassword() {
                 <p className="text-white text-sm font-semibold">
                   Este link de recuperación no es válido o ya venció.
                 </p>
-                <a
-                  href="/forgot-password"
+                <Link
+                  to="/forgot-password"
                   className="
                     mt-2 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl
                     bg-cyan-400 hover:bg-cyan-300 text-[#0a0e1a] font-bold text-sm
@@ -98,10 +98,11 @@ export default function ResetPassword() {
                   "
                 >
                   Solicitar un nuevo link
-                </a>
+                </Link>
               </div>
             ) : (
-              <form onSubmit={handleSubmit} className="space-y-3.5" noValidate>
+              <>
+                <form onSubmit={handleSubmit} className="space-y-3.5" noValidate>
                 <label className="block">
                   <span className="sr-only">Nueva contraseña</span>
                   <div className="relative">
@@ -181,7 +182,17 @@ export default function ResetPassword() {
                     </>
                   )}
                 </button>
-              </form>
+                </form>
+
+                {done && (
+                  <Link
+                    to="/login"
+                    className="block w-full mt-3 text-center text-gray-500 text-xs hover:text-cyan-400 transition"
+                  >
+                    ¿No fuiste redirigido? Ir a iniciar sesión
+                  </Link>
+                )}
+              </>
             )}
           </div>
         </div>
