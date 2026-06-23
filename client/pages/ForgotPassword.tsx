@@ -23,7 +23,8 @@ export default function ForgotPassword() {
       // distingue eso en la respuesta para evitar enumeración de usuarios.
       // Solo mostramos error en fallas reales de red/servidor; si hay `error`
       // seguimos mostrando el estado de éxito igual, por la misma razón.
-      if (resetError && resetError.status && resetError.status >= 500) {
+      const status = resetError?.status;
+      if (status !== undefined && (status === 0 || status >= 500)) {
         setError("Error de servidor. Intenta nuevamente en unos minutos.");
         setLoading(false);
         return;
