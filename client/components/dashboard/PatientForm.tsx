@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ChevronDown, ChevronUp, Save, Loader2, Plus, X, AlertTriangle, CheckCircle2, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -68,6 +68,7 @@ interface PatientFormProps {
   patientId?: string; // if provided, edit mode
   onSaved: () => void | Promise<void>;
   onCancel: () => void;
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 const EMPTY: Partial<PatientProfile> = {
@@ -113,7 +114,7 @@ type SectionId =
   | "photo" | "personal" | "contact" | "professional" | "evaluation" | "parq" | "medical"
   | "conditions" | "sports" | "substances" | "emergency" | "extra" | "admin";
 
-export default function PatientForm({ patientId, onSaved, onCancel }: PatientFormProps) {
+export default function PatientForm({ patientId, onSaved, onCancel, onDirtyChange }: PatientFormProps) {
   const [form, setForm] = useState<Partial<PatientProfile>>(EMPTY);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -127,17 +128,35 @@ export default function PatientForm({ patientId, onSaved, onCancel }: PatientFor
   const [rutTouched, setRutTouched] = useState(false);
   const { user } = useAuth();
   const [evalForm, setEvalForm] = useState<BodyEvalFormState>(EMPTY_BODY_EVAL_FORM);
+  const savedSnapshotRef = useRef<{ form: Partial<PatientProfile>; evalForm: BodyEvalFormState }>({
+    form: EMPTY,
+    evalForm: EMPTY_BODY_EVAL_FORM,
+  });
+  const lastDirtyRef = useRef(false);
 
   useEffect(() => {
     if (patientId) {
       setLoading(true);
       getPatient(patientId).then((res) => {
-        if (res.success && res.data) setForm({ ...EMPTY, ...res.data });
-        else toast.error(`Error: ${res.error}`);
+        if (res.success && res.data) {
+          const loaded = { ...EMPTY, ...res.data };
+          setForm(loaded);
+          savedSnapshotRef.current = { form: loaded, evalForm: EMPTY_BODY_EVAL_FORM };
+        } else toast.error(`Error: ${res.error}`);
         setLoading(false);
       });
     }
   }, [patientId]);
+
+  useEffect(() => {
+    const dirty =
+      JSON.stringify(form) !== JSON.stringify(savedSnapshotRef.current.form) ||
+      JSON.stringify(evalForm) !== JSON.stringify(savedSnapshotRef.current.evalForm);
+    if (dirty !== lastDirtyRef.current) {
+      lastDirtyRef.current = dirty;
+      onDirtyChange?.(dirty);
+    }
+  }, [form, evalForm, onDirtyChange]);
 
   const set = <K extends keyof PatientProfile>(k: K, v: PatientProfile[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
@@ -200,6 +219,9 @@ export default function PatientForm({ patientId, onSaved, onCancel }: PatientFor
       const res = await updatePatient(patientId, form);
       if (res.success) {
         toast.success("Paciente actualizado");
+        savedSnapshotRef.current = { form, evalForm: EMPTY_BODY_EVAL_FORM };
+        lastDirtyRef.current = false;
+        onDirtyChange?.(false);
         if (!isBodyEvalFormEmpty(evalForm)) {
           const evalRes = await createBodyEvaluation({
             patient_id: patientId,
