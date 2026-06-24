@@ -18,6 +18,8 @@ const Booking = lazy(() => import("./pages/Booking"));
 const TeacherDashboard = lazy(() => import("./pages/TeacherDashboard"));
 const StudentDashboard = lazy(() => import("./pages/StudentDashboard"));
 const StudentCalendar = lazy(() => import("./pages/StudentCalendar"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 
 const LoadingFallback = () => (
   <div className="flex items-center justify-center h-screen">
@@ -51,6 +53,22 @@ const App = () => {
               }
             />
             <Route path="/login" element={<Login />} />
+            <Route
+              path="/forgot-password"
+              element={
+                <Suspense fallback={<LoadingFallback />}>
+                  <ForgotPassword />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/reset-password"
+              element={
+                <Suspense fallback={<LoadingFallback />}>
+                  <ResetPassword />
+                </Suspense>
+              }
+            />
             <Route
               path="/dashboard"
               element={

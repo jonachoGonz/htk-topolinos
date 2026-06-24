@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { Mail, Lock, ArrowRight, ShieldCheck, GraduationCap, User, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { loginTeacher, loginStudent, supabase } from "@/services/supabase";
@@ -307,12 +307,12 @@ export default function Login() {
               </form>
 
               {/* Forgot password */}
-              <button
-                type="button"
-                className="w-full mt-4 text-center text-gray-500 text-xs hover:text-cyan-400 transition"
+              <Link
+                to="/forgot-password"
+                className="block w-full mt-4 text-center text-gray-500 text-xs hover:text-cyan-400 transition"
               >
                 ¿Olvidaste tu contraseña?
-              </button>
+              </Link>
 
               {/* Footer trust badge */}
               <div className="flex items-center justify-center gap-2 mt-6 pt-4 border-t border-white/[0.06]">
