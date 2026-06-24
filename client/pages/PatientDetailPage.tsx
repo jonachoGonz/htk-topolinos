@@ -153,7 +153,7 @@ export default function PatientDetailPage() {
                 <PausePanel
                   patientId={id}
                   isPaused={!!patient?.is_paused}
-                  onChanged={() => { refresh(); navigate(-1); }}
+                  onChanged={() => { refresh(); navigate("/dashboard/teacher?tab=patients"); }}
                 />
               )}
             </div>
