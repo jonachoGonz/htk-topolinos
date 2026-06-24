@@ -20,6 +20,8 @@ const StudentDashboard = lazy(() => import("./pages/StudentDashboard"));
 const StudentCalendar = lazy(() => import("./pages/StudentCalendar"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const PatientDetailPage = lazy(() => import("./pages/PatientDetailPage"));
+const TeacherDetailPage = lazy(() => import("./pages/TeacherDetailPage"));
 
 const LoadingFallback = () => (
   <div className="flex items-center justify-center h-screen">
@@ -105,6 +107,26 @@ const App = () => {
                 <ProtectedRoute requiredRole="student">
                   <Suspense fallback={<LoadingFallback />}>
                     <StudentCalendar />
+                  </Suspense>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/patients/:id"
+              element={
+                <ProtectedRoute requiredRole="teacher">
+                  <Suspense fallback={<LoadingFallback />}>
+                    <PatientDetailPage />
+                  </Suspense>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/teachers/:id"
+              element={
+                <ProtectedRoute requiredRole="teacher">
+                  <Suspense fallback={<LoadingFallback />}>
+                    <TeacherDetailPage />
                   </Suspense>
                 </ProtectedRoute>
               }

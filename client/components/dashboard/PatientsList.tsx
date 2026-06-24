@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { Eye, Search, Pause, Loader2, Trash2, MessageCircle, AlertTriangle, UserPlus, X, Mail, Loader } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -12,8 +13,6 @@ import {
   type PatientProfile,
   type PatientAttendance,
 } from "@/services/supabase";
-import PatientDetailModal from "./PatientDetailModal";
-import TeacherDetailModal from "./TeacherDetailModal";
 
 interface PatientsListProps {
   professionalId?: string;
@@ -59,7 +58,7 @@ export default function PatientsList({ roleFilter = "student" }: PatientsListPro
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [showPaused, setShowPaused] = useState(true);
-  const [selected, setSelected] = useState<PatientProfile | null>(null);
+  const navigate = useNavigate();
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [createForm, setCreateForm] = useState({
     full_name: "", email: "", phone: "", rut_dni: "", password: "", send_invite: false,
@@ -295,7 +294,7 @@ export default function PatientsList({ roleFilter = "student" }: PatientsListPro
 
                 {/* Actions */}
                 <div className="flex gap-2 pt-2 border-t border-white/[0.04]">
-                  <button onClick={() => setSelected(p)}
+                  <button onClick={() => navigate(isTeacherView ? `/dashboard/teachers/${p.id}` : `/dashboard/patients/${p.id}`)}
                     className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 bg-[#00d4ff]/10 border border-[#00d4ff]/30 text-[#00d4ff] rounded-lg text-xs font-semibold hover:bg-[#00d4ff]/20 transition">
                     <Eye className="w-3.5 h-3.5" /> Ver / Editar
                   </button>
@@ -310,24 +309,6 @@ export default function PatientsList({ roleFilter = "student" }: PatientsListPro
             );
           })}
         </div>
-      )}
-
-      {selected && isTeacherView && (
-        <TeacherDetailModal
-          teacherId={selected.id}
-          teacherName={selected.full_name || "Profesional"}
-          onClose={() => { setSelected(null); fetchAll(); }}
-        />
-      )}
-      {selected && !isTeacherView && (
-        <PatientDetailModal
-          patientId={selected.id}
-          patientName={selected.full_name || "Paciente"}
-          isPaused={!!selected.is_paused}
-          pauseReason={selected.pause_reason}
-          onClose={() => setSelected(null)}
-          onChanged={fetchAll}
-        />
       )}
 
       {/* Create patient modal */}

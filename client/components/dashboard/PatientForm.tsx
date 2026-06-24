@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ChevronDown, ChevronUp, Save, Loader2, Plus, X, AlertTriangle, CheckCircle2, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -15,6 +15,7 @@ import {
 } from "@/services/supabase";
 import { isValidRut, formatRut, cleanRut } from "@/lib/rut";
 import PhotoUploader from "./PhotoUploader";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   EMPTY_BODY_EVAL_FORM,
   buildBodyEvaluationPayload,
@@ -67,6 +68,7 @@ interface PatientFormProps {
   patientId?: string; // if provided, edit mode
   onSaved: () => void | Promise<void>;
   onCancel: () => void;
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 const EMPTY: Partial<PatientProfile> = {
@@ -112,7 +114,7 @@ type SectionId =
   | "photo" | "personal" | "contact" | "professional" | "evaluation" | "parq" | "medical"
   | "conditions" | "sports" | "substances" | "emergency" | "extra" | "admin";
 
-export default function PatientForm({ patientId, onSaved, onCancel }: PatientFormProps) {
+export default function PatientForm({ patientId, onSaved, onCancel, onDirtyChange }: PatientFormProps) {
   const [form, setForm] = useState<Partial<PatientProfile>>(EMPTY);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -126,17 +128,35 @@ export default function PatientForm({ patientId, onSaved, onCancel }: PatientFor
   const [rutTouched, setRutTouched] = useState(false);
   const { user } = useAuth();
   const [evalForm, setEvalForm] = useState<BodyEvalFormState>(EMPTY_BODY_EVAL_FORM);
+  const savedSnapshotRef = useRef<{ form: Partial<PatientProfile>; evalForm: BodyEvalFormState }>({
+    form: EMPTY,
+    evalForm: EMPTY_BODY_EVAL_FORM,
+  });
+  const lastDirtyRef = useRef(false);
 
   useEffect(() => {
     if (patientId) {
       setLoading(true);
       getPatient(patientId).then((res) => {
-        if (res.success && res.data) setForm({ ...EMPTY, ...res.data });
-        else toast.error(`Error: ${res.error}`);
+        if (res.success && res.data) {
+          const loaded = { ...EMPTY, ...res.data };
+          setForm(loaded);
+          savedSnapshotRef.current = { form: loaded, evalForm: EMPTY_BODY_EVAL_FORM };
+        } else toast.error(`Error: ${res.error}`);
         setLoading(false);
       });
     }
   }, [patientId]);
+
+  useEffect(() => {
+    const dirty =
+      JSON.stringify(form) !== JSON.stringify(savedSnapshotRef.current.form) ||
+      JSON.stringify(evalForm) !== JSON.stringify(savedSnapshotRef.current.evalForm);
+    if (dirty !== lastDirtyRef.current) {
+      lastDirtyRef.current = dirty;
+      onDirtyChange?.(dirty);
+    }
+  }, [form, evalForm, onDirtyChange]);
 
   const set = <K extends keyof PatientProfile>(k: K, v: PatientProfile[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
@@ -199,6 +219,7 @@ export default function PatientForm({ patientId, onSaved, onCancel }: PatientFor
       const res = await updatePatient(patientId, form);
       if (res.success) {
         toast.success("Paciente actualizado");
+        let evalStillDirty = false;
         if (!isBodyEvalFormEmpty(evalForm)) {
           const evalRes = await createBodyEvaluation({
             patient_id: patientId,
@@ -210,8 +231,12 @@ export default function PatientForm({ patientId, onSaved, onCancel }: PatientFor
             setEvalForm(EMPTY_BODY_EVAL_FORM);
           } else {
             toast.error(`La evaluación inicial no se pudo guardar: ${evalRes.error}`);
+            evalStillDirty = true;
           }
         }
+        savedSnapshotRef.current = { form, evalForm: EMPTY_BODY_EVAL_FORM };
+        lastDirtyRef.current = evalStillDirty;
+        onDirtyChange?.(evalStillDirty);
         // Await aquí es clave: el wizard de onboarding usa onSaved para
         // refrescar su estado y decidir si puede avanzar al siguiente paso.
         // Sin await, el wizard quedaba con el botón "Completa los datos
@@ -241,354 +266,371 @@ export default function PatientForm({ patientId, onSaved, onCancel }: PatientFor
 
   return (
     <div className="space-y-3">
-      {patientId && (
-        <Section id="photo" title="Foto del paciente" open={open.photo} onToggle={toggle}>
-          <PhotoUploader
-            patientId={patientId}
-            currentUrl={form.photo_url}
-            onChange={(url) => set("photo_url", url as any)}
-          />
-        </Section>
-      )}
+      <Tabs defaultValue="perfil" className="space-y-3">
+        <TabsList>
+          <TabsTrigger value="perfil">Perfil</TabsTrigger>
+          <TabsTrigger value="salud">Salud</TabsTrigger>
+          <TabsTrigger value="evaluacion">Evaluación inicial</TabsTrigger>
+          <TabsTrigger value="administrativo">Administrativo</TabsTrigger>
+        </TabsList>
 
-      <Section id="personal" title="Datos personales" open={open.personal} onToggle={toggle}>
-        <Grid>
-          <Field label="Nombre completo *"><Input value={form.full_name || ""} onChange={(v) => set("full_name", v)} /></Field>
-          <Field label="RUT / DNI">
-            <Input
-              value={form.rut_dni || ""}
-              onChange={(v) => { set("rut_dni", v); setRutTouched(true); }}
-              onBlur={() => {
-                if (form.rut_dni && isValidRut(form.rut_dni)) {
-                  set("rut_dni", formatRut(form.rut_dni));
-                }
-              }}
-              placeholder="12.345.678-9"
-            />
-            {rutTouched && form.rut_dni && !rutValid && (
-              <p className="text-[10px] text-red-400 mt-1">RUT inválido (verifica formato y dígito)</p>
-            )}
-            {rutTouched && form.rut_dni && rutValid && (
-              <p className="text-[10px] text-emerald-400 mt-1">RUT válido ✓</p>
-            )}
-          </Field>
-          <Field label="N° de socio">
-            <div className="flex items-center gap-2">
-              <Input value={form.socio_number || "—"} disabled className="flex-1" />
-              {form.socio_number && (
-                <button type="button"
-                  onClick={() => { navigator.clipboard.writeText(form.socio_number || ""); toast.success("Copiado"); }}
-                  className="p-2 rounded-lg bg-white/[0.05] border border-white/10 text-gray-400 hover:text-white transition shrink-0"
-                  title="Copiar">
-                  <Copy className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-          </Field>
-          <Field label="Fecha de nacimiento">
-            <Input type="date" value={form.birth_date || ""} onChange={(v) => set("birth_date", v)} />
-          </Field>
-          <Field label="Edad">
-            <Input value={age != null ? `${age} años` : "—"} disabled />
-          </Field>
-          <Field label="Fecha de ingreso">
-            <Input type="date" value={(form.joined_at || "").slice(0, 10) || todayIso()} onChange={(v) => set("joined_at", v)} />
-          </Field>
-          <Field label="Género">
-            <Select value={form.gender || ""} onChange={(v) => set("gender", v)}
-              options={[["", "—"], ["M", "Masculino"], ["F", "Femenino"], ["X", "Otro / Prefiere no decir"]]} />
-          </Field>
-          <Field label="Estado civil">
-            <Select value={form.marital_status || ""} onChange={(v) => set("marital_status", v as any)}
-              options={[["", "—"], ["soltero", "Soltero/a"], ["casado", "Casado/a"], ["conviviente", "Conviviente"], ["divorciado", "Divorciado/a"], ["viudo", "Viudo/a"], ["otro", "Otro"]]} />
-          </Field>
-          <Field label="Hijos">
-            <div className="flex items-center gap-3">
-              <label className="flex items-center gap-2 text-sm text-white whitespace-nowrap">
-                <input type="checkbox" checked={!!form.has_children}
-                  onChange={(e) => set("has_children", e.target.checked)} />
-                Sí
-              </label>
-              {form.has_children && (
-                <div className="flex-1">
-                  <label className="block text-[10px] uppercase tracking-wider text-gray-500 mb-1">Número de hijos</label>
-                  <Input type="number" value={String(form.num_children ?? 0)}
-                    onChange={(v) => set("num_children", parseInt(v) || 0)} />
+        <TabsContent value="perfil" className="space-y-3">
+          {patientId && (
+            <Section id="photo" title="Foto del paciente" open={open.photo} onToggle={toggle}>
+              <PhotoUploader
+                patientId={patientId}
+                currentUrl={form.photo_url}
+                onChange={(url) => set("photo_url", url as any)}
+              />
+            </Section>
+          )}
+
+          <Section id="personal" title="Datos personales" open={open.personal} onToggle={toggle}>
+            <Grid>
+              <Field label="Nombre completo *"><Input value={form.full_name || ""} onChange={(v) => set("full_name", v)} /></Field>
+              <Field label="RUT / DNI">
+                <Input
+                  value={form.rut_dni || ""}
+                  onChange={(v) => { set("rut_dni", v); setRutTouched(true); }}
+                  onBlur={() => {
+                    if (form.rut_dni && isValidRut(form.rut_dni)) {
+                      set("rut_dni", formatRut(form.rut_dni));
+                    }
+                  }}
+                  placeholder="12.345.678-9"
+                />
+                {rutTouched && form.rut_dni && !rutValid && (
+                  <p className="text-[10px] text-red-400 mt-1">RUT inválido (verifica formato y dígito)</p>
+                )}
+                {rutTouched && form.rut_dni && rutValid && (
+                  <p className="text-[10px] text-emerald-400 mt-1">RUT válido ✓</p>
+                )}
+              </Field>
+              <Field label="N° de socio">
+                <div className="flex items-center gap-2">
+                  <Input value={form.socio_number || "—"} disabled className="flex-1" />
+                  {form.socio_number && (
+                    <button type="button"
+                      onClick={() => { navigator.clipboard.writeText(form.socio_number || ""); toast.success("Copiado"); }}
+                      className="p-2 rounded-lg bg-white/[0.05] border border-white/10 text-gray-400 hover:text-white transition shrink-0"
+                      title="Copiar">
+                      <Copy className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
-              )}
+              </Field>
+              <Field label="Fecha de nacimiento">
+                <Input type="date" value={form.birth_date || ""} onChange={(v) => set("birth_date", v)} />
+              </Field>
+              <Field label="Edad">
+                <Input value={age != null ? `${age} años` : "—"} disabled />
+              </Field>
+              <Field label="Fecha de ingreso">
+                <Input type="date" value={(form.joined_at || "").slice(0, 10) || todayIso()} onChange={(v) => set("joined_at", v)} />
+              </Field>
+              <Field label="Género">
+                <Select value={form.gender || ""} onChange={(v) => set("gender", v)}
+                  options={[["", "—"], ["M", "Masculino"], ["F", "Femenino"], ["X", "Otro / Prefiere no decir"]]} />
+              </Field>
+              <Field label="Estado civil">
+                <Select value={form.marital_status || ""} onChange={(v) => set("marital_status", v as any)}
+                  options={[["", "—"], ["soltero", "Soltero/a"], ["casado", "Casado/a"], ["conviviente", "Conviviente"], ["divorciado", "Divorciado/a"], ["viudo", "Viudo/a"], ["otro", "Otro"]]} />
+              </Field>
+              <Field label="Hijos">
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-2 text-sm text-white whitespace-nowrap">
+                    <input type="checkbox" checked={!!form.has_children}
+                      onChange={(e) => set("has_children", e.target.checked)} />
+                    Sí
+                  </label>
+                  {form.has_children && (
+                    <div className="flex-1">
+                      <label className="block text-[10px] uppercase tracking-wider text-gray-500 mb-1">Número de hijos</label>
+                      <Input type="number" value={String(form.num_children ?? 0)}
+                        onChange={(v) => set("num_children", parseInt(v) || 0)} />
+                    </div>
+                  )}
+                </div>
+              </Field>
+              <Field label="Lateralidad">
+                <Select value={form.handedness || ""} onChange={(v) => set("handedness", v as any)}
+                  options={[["", "—"], ["diestro", "Diestro"], ["zurdo", "Zurdo"], ["ambidiestro", "Ambidiestro"]]} />
+              </Field>
+            </Grid>
+          </Section>
+
+          <Section id="contact" title="Contacto" open={open.contact} onToggle={toggle}>
+            <Grid>
+              <Field label="Email"><Input type="email" value={form.email || ""} onChange={(v) => set("email", v)} /></Field>
+              <Field label="Teléfono"><Input value={form.phone || ""} onChange={(v) => set("phone", v)} /></Field>
+              <Field label="Dirección"><Input value={form.address || ""} onChange={(v) => set("address", v)} placeholder="Calle" /></Field>
+              <Field label="N° casa / depto"><Input value={form.address_number || ""} onChange={(v) => set("address_number", v)} /></Field>
+              <Field label="Comuna"><Input value={form.comuna || ""} onChange={(v) => set("comuna", v)} /></Field>
+              <Field label="@Redes sociales"><Input value={form.social_media_handle || ""} onChange={(v) => set("social_media_handle", v)} placeholder="@usuario" /></Field>
+            </Grid>
+          </Section>
+
+          <Section id="emergency" title="Contacto de emergencia" open={open.emergency} onToggle={toggle}>
+            <RepeatRows
+              items={(form.emergency_contacts as EmergencyContact[]) || []}
+              onAdd={() => addRow<EmergencyContact>("emergency_contacts", { name: "", phone: "", relation: "" })}
+              onRemove={(i) => removeRow("emergency_contacts", i)}
+              render={(row, i) => (
+                <>
+                  <Input value={row.name} onChange={(v) => updateRow("emergency_contacts", i, { name: v })} placeholder="Nombre" className="flex-1 min-w-[140px]" />
+                  <Input value={row.phone || ""} onChange={(v) => updateRow("emergency_contacts", i, { phone: v })} placeholder="Teléfono" className="w-36" />
+                  <Input value={row.relation || ""} onChange={(v) => updateRow("emergency_contacts", i, { relation: v })} placeholder="Padre, pareja, amigo…" className="w-44" />
+                </>
+              )} />
+          </Section>
+
+          <Section id="professional" title="Datos profesionales" open={open.professional} onToggle={toggle}>
+            <Grid>
+              <Field label="Profesión"><Input value={form.profession || ""} onChange={(v) => set("profession", v)} /></Field>
+              <Field label="Labor actual"><Input value={form.occupation || ""} onChange={(v) => set("occupation", v)} /></Field>
+            </Grid>
+          </Section>
+        </TabsContent>
+
+        <TabsContent value="salud" className="space-y-3">
+          <Section id="parq" title="PAR-Q (Cuestionario de aptitud para actividad física)" open={open.parq} onToggle={toggle}>
+            <p className="text-xs text-gray-400 mb-3">
+              Cuestionario estándar internacional. Responde con honestidad — si marcas <strong>SÍ</strong> en
+              alguna pregunta, recomendamos consultar con un médico antes de iniciar entrenamiento.
+            </p>
+            <div className="space-y-2">
+              {PARQ_QUESTIONS.map((q, idx) => {
+                const ans = parqAnswers[q.key];
+                return (
+                  <div
+                    key={q.key}
+                    className={`p-3 rounded-lg border ${
+                      ans === true
+                        ? "bg-red-500/10 border-red-500/20"
+                        : ans === false
+                        ? "bg-emerald-500/5 border-emerald-500/15"
+                        : "bg-[#0f131a] border-white/10"
+                    }`}
+                  >
+                    <p className="text-xs text-white mb-2">
+                      <span className="text-gray-500 mr-1">{idx + 1}.</span>
+                      {q.text}
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setParq(q.key, true)}
+                        className={`flex-1 py-1.5 rounded text-xs font-semibold transition ${
+                          ans === true
+                            ? "bg-red-500 text-white"
+                            : "bg-white/[0.05] text-gray-400 hover:text-white"
+                        }`}
+                      >
+                        SÍ
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setParq(q.key, false)}
+                        className={`flex-1 py-1.5 rounded text-xs font-semibold transition ${
+                          ans === false
+                            ? "bg-emerald-500 text-white"
+                            : "bg-white/[0.05] text-gray-400 hover:text-white"
+                        }`}
+                      >
+                        NO
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          </Field>
-          <Field label="Lateralidad">
-            <Select value={form.handedness || ""} onChange={(v) => set("handedness", v as any)}
-              options={[["", "—"], ["diestro", "Diestro"], ["zurdo", "Zurdo"], ["ambidiestro", "Ambidiestro"]]} />
-          </Field>
-        </Grid>
-      </Section>
 
-      <Section id="contact" title="Contacto" open={open.contact} onToggle={toggle}>
-        <Grid>
-          <Field label="Email"><Input type="email" value={form.email || ""} onChange={(v) => set("email", v)} /></Field>
-          <Field label="Teléfono"><Input value={form.phone || ""} onChange={(v) => set("phone", v)} /></Field>
-          <Field label="Dirección"><Input value={form.address || ""} onChange={(v) => set("address", v)} placeholder="Calle" /></Field>
-          <Field label="N° casa / depto"><Input value={form.address_number || ""} onChange={(v) => set("address_number", v)} /></Field>
-          <Field label="Comuna"><Input value={form.comuna || ""} onChange={(v) => set("comuna", v)} /></Field>
-          <Field label="@Redes sociales"><Input value={form.social_media_handle || ""} onChange={(v) => set("social_media_handle", v)} placeholder="@usuario" /></Field>
-        </Grid>
-      </Section>
-
-      <Section id="professional" title="Datos profesionales" open={open.professional} onToggle={toggle}>
-        <Grid>
-          <Field label="Profesión"><Input value={form.profession || ""} onChange={(v) => set("profession", v)} /></Field>
-          <Field label="Labor actual"><Input value={form.occupation || ""} onChange={(v) => set("occupation", v)} /></Field>
-        </Grid>
-      </Section>
-
-      <Section id="evaluation" title="Evaluación inicial (opcional)" open={open.evaluation} onToggle={toggle}>
-        <p className="text-xs text-gray-400 mb-3">
-          Si estás creando o editando este perfil durante una evaluación presencial, puedes
-          registrar los datos aquí mismo. No es obligatorio: si lo dejas vacío, no se crea
-          ningún registro en el historial de evaluaciones.
-        </p>
-        <BodyEvaluationFormFields form={evalForm} onChange={setEvalForm} />
-      </Section>
-
-      <Section id="parq" title="PAR-Q (Cuestionario de aptitud para actividad física)" open={open.parq} onToggle={toggle}>
-        <p className="text-xs text-gray-400 mb-3">
-          Cuestionario estándar internacional. Responde con honestidad — si marcas <strong>SÍ</strong> en
-          alguna pregunta, recomendamos consultar con un médico antes de iniciar entrenamiento.
-        </p>
-        <div className="space-y-2">
-          {PARQ_QUESTIONS.map((q, idx) => {
-            const ans = parqAnswers[q.key];
-            return (
+            {allParqAnswered && (
               <div
-                key={q.key}
-                className={`p-3 rounded-lg border ${
-                  ans === true
-                    ? "bg-red-500/10 border-red-500/20"
-                    : ans === false
-                    ? "bg-emerald-500/5 border-emerald-500/15"
-                    : "bg-[#0f131a] border-white/10"
+                className={`mt-4 p-3 rounded-lg flex items-start gap-2 ${
+                  parqClearedComputed
+                    ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-200"
+                    : "bg-red-500/10 border border-red-500/20 text-red-200"
                 }`}
               >
-                <p className="text-xs text-white mb-2">
-                  <span className="text-gray-500 mr-1">{idx + 1}.</span>
-                  {q.text}
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setParq(q.key, true)}
-                    className={`flex-1 py-1.5 rounded text-xs font-semibold transition ${
-                      ans === true
-                        ? "bg-red-500 text-white"
-                        : "bg-white/[0.05] text-gray-400 hover:text-white"
-                    }`}
-                  >
-                    SÍ
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setParq(q.key, false)}
-                    className={`flex-1 py-1.5 rounded text-xs font-semibold transition ${
-                      ans === false
-                        ? "bg-emerald-500 text-white"
-                        : "bg-white/[0.05] text-gray-400 hover:text-white"
-                    }`}
-                  >
-                    NO
-                  </button>
+                {parqClearedComputed ? (
+                  <CheckCircle2 className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                ) : (
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                )}
+                <div>
+                  <p className="text-xs font-semibold">
+                    {parqClearedComputed
+                      ? "✓ Apto para iniciar actividad física"
+                      : "⚠ Requiere autorización médica antes de entrenar"}
+                  </p>
+                  <p className="text-[10px] mt-0.5 opacity-80">
+                    Completado: {form.parq_completed_at ? new Date(form.parq_completed_at).toLocaleString() : "ahora"}
+                  </p>
                 </div>
               </div>
-            );
-          })}
-        </div>
-
-        {allParqAnswered && (
-          <div
-            className={`mt-4 p-3 rounded-lg flex items-start gap-2 ${
-              parqClearedComputed
-                ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-200"
-                : "bg-red-500/10 border border-red-500/20 text-red-200"
-            }`}
-          >
-            {parqClearedComputed ? (
-              <CheckCircle2 className="w-4 h-4 flex-shrink-0 mt-0.5" />
-            ) : (
-              <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
             )}
-            <div>
-              <p className="text-xs font-semibold">
-                {parqClearedComputed
-                  ? "✓ Apto para iniciar actividad física"
-                  : "⚠ Requiere autorización médica antes de entrenar"}
-              </p>
-              <p className="text-[10px] mt-0.5 opacity-80">
-                Completado: {form.parq_completed_at ? new Date(form.parq_completed_at).toLocaleString() : "ahora"}
-              </p>
-            </div>
-          </div>
-        )}
 
-        {allParqAnswered && !parqClearedComputed && (
-          <div className="mt-3">
-            <label className="block text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-1">
-              Notas de autorización médica (si aplica)
-            </label>
-            <Textarea
-              value={form.parq_clearance_notes || ""}
-              onChange={(v: string) => set("parq_clearance_notes", v)}
-              rows={2}
-              placeholder="Ej: Médico tratante autorizó actividad de bajo impacto. Documento adjunto en archivos."
-            />
-          </div>
-        )}
-      </Section>
+            {allParqAnswered && !parqClearedComputed && (
+              <div className="mt-3">
+                <label className="block text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-1">
+                  Notas de autorización médica (si aplica)
+                </label>
+                <Textarea
+                  value={form.parq_clearance_notes || ""}
+                  onChange={(v: string) => set("parq_clearance_notes", v)}
+                  rows={2}
+                  placeholder="Ej: Médico tratante autorizó actividad de bajo impacto. Documento adjunto en archivos."
+                />
+              </div>
+            )}
+          </Section>
 
-      <Section id="medical" title="Datos médicos básicos" open={open.medical} onToggle={toggle}>
-        <Grid>
-          <Field label="Tipo de sangre">
-            <Select value={form.blood_type || ""} onChange={(v) => set("blood_type", v as any)}
-              options={[["", "—"], ["A+", "A+"], ["A-", "A-"], ["B+", "B+"], ["B-", "B-"], ["AB+", "AB+"], ["AB-", "AB-"], ["O+", "O+"], ["O-", "O-"]]} />
-          </Field>
-          <Field label="Aseguradora">
-            <Select value={form.insurer || ""} onChange={(v) => set("insurer", v)}
-              options={[["", "—"], ["Fonasa", "Fonasa"], ["Isapre", "Isapre"], ["Particular", "Particular"], ["Otro", "Otro"]]} />
-          </Field>
-          <Field label="Centro de salud al cual acudir"><Input value={form.health_center || ""} onChange={(v) => set("health_center", v)} /></Field>
-          <Field label="Alergias" full><Textarea value={form.allergies || ""} onChange={(v) => set("allergies", v)} rows={2} /></Field>
-          <Field label="Cirugías" full><Textarea value={form.surgeries || ""} onChange={(v) => set("surgeries", v)} rows={2} placeholder="Tipo, fecha aprox., complicaciones..." /></Field>
-          <Field label="Dolencias actuales" full><Textarea value={form.ailments || ""} onChange={(v) => set("ailments", v)} rows={2} /></Field>
-          <Field label="Lesiones (actuales/pasadas)" full><Textarea value={form.injuries || ""} onChange={(v) => set("injuries", v)} rows={2} /></Field>
-        </Grid>
-      </Section>
+          <Section id="medical" title="Datos médicos básicos" open={open.medical} onToggle={toggle}>
+            <Grid>
+              <Field label="Tipo de sangre">
+                <Select value={form.blood_type || ""} onChange={(v) => set("blood_type", v as any)}
+                  options={[["", "—"], ["A+", "A+"], ["A-", "A-"], ["B+", "B+"], ["B-", "B-"], ["AB+", "AB+"], ["AB-", "AB-"], ["O+", "O+"], ["O-", "O-"]]} />
+              </Field>
+              <Field label="Aseguradora">
+                <Select value={form.insurer || ""} onChange={(v) => set("insurer", v)}
+                  options={[["", "—"], ["Fonasa", "Fonasa"], ["Isapre", "Isapre"], ["Particular", "Particular"], ["Otro", "Otro"]]} />
+              </Field>
+              <Field label="Centro de salud al cual acudir"><Input value={form.health_center || ""} onChange={(v) => set("health_center", v)} /></Field>
+              <Field label="Alergias" full><Textarea value={form.allergies || ""} onChange={(v) => set("allergies", v)} rows={2} /></Field>
+              <Field label="Cirugías" full><Textarea value={form.surgeries || ""} onChange={(v) => set("surgeries", v)} rows={2} placeholder="Tipo, fecha aprox., complicaciones..." /></Field>
+              <Field label="Dolencias actuales" full><Textarea value={form.ailments || ""} onChange={(v) => set("ailments", v)} rows={2} /></Field>
+              <Field label="Lesiones (actuales/pasadas)" full><Textarea value={form.injuries || ""} onChange={(v) => set("injuries", v)} rows={2} /></Field>
+            </Grid>
+          </Section>
 
-      <Section id="conditions" title="Enfermedades / condiciones a considerar" open={open.conditions} onToggle={toggle}>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-          {COMMON_DISEASES.map((d) => {
-            const checked = (form.diseases || []).includes(d.key);
-            return (
-              <label key={d.key}
+          <Section id="conditions" title="Enfermedades / condiciones a considerar" open={open.conditions} onToggle={toggle}>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              {COMMON_DISEASES.map((d) => {
+                const checked = (form.diseases || []).includes(d.key);
+                return (
+                  <label key={d.key}
+                    className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition ${
+                      checked ? "bg-rose-500/10 border-rose-500/30 text-rose-200" : "bg-[#0f131a] border-white/10 text-gray-400 hover:text-white"
+                    }`}>
+                    <input type="checkbox" checked={checked} onChange={() => toggleDisease(d.key)} />
+                    <span className="text-xs">{d.label}</span>
+                  </label>
+                );
+              })}
+              <label
                 className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition ${
-                  checked ? "bg-rose-500/10 border-rose-500/30 text-rose-200" : "bg-[#0f131a] border-white/10 text-gray-400 hover:text-white"
+                  (form.diseases || []).includes("otra") ? "bg-rose-500/10 border-rose-500/30 text-rose-200" : "bg-[#0f131a] border-white/10 text-gray-400 hover:text-white"
                 }`}>
-                <input type="checkbox" checked={checked} onChange={() => toggleDisease(d.key)} />
-                <span className="text-xs">{d.label}</span>
-              </label>
-            );
-          })}
-          <label
-            className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition ${
-              (form.diseases || []).includes("otra") ? "bg-rose-500/10 border-rose-500/30 text-rose-200" : "bg-[#0f131a] border-white/10 text-gray-400 hover:text-white"
-            }`}>
-            <input type="checkbox" checked={(form.diseases || []).includes("otra")} onChange={() => toggleDisease("otra")} />
-            <span className="text-xs">Otra</span>
-          </label>
-        </div>
-        {(form.diseases || []).includes("otra") && (
-          <div className="mt-3">
-            <Field label="Especificar" full>
-              <Input value={form.diseases_other || ""} onChange={(v) => set("diseases_other", v)} />
-            </Field>
-          </div>
-        )}
-      </Section>
-
-      <Section id="sports" title="Deportes que practica" open={open.sports} onToggle={toggle}>
-        <RepeatRows
-          items={(form.sports as SportEntry[]) || []}
-          onAdd={() => addRow<SportEntry>("sports", { name: "", since: "", frequency_per_week: undefined })}
-          onRemove={(i) => removeRow("sports", i)}
-          render={(row, i) => (
-            <>
-              <Input value={row.name} onChange={(v) => updateRow("sports", i, { name: v })} placeholder="Deporte" className="flex-1 min-w-[140px]" />
-              <Input value={row.since || ""} onChange={(v) => updateRow("sports", i, { since: v })} placeholder="Desde (YYYY)" className="w-32" />
-              <Input type="number" value={String(row.frequency_per_week ?? "")} onChange={(v) => updateRow("sports", i, { frequency_per_week: parseInt(v) || undefined })} placeholder="x/sem" className="w-24" />
-            </>
-          )} />
-      </Section>
-
-      <Section id="substances" title="Medicamentos y sustancias" open={open.substances} onToggle={toggle}>
-        <p className="text-xs text-gray-500 mb-2 font-semibold uppercase">Medicamentos</p>
-        <RepeatRows
-          items={(form.medications as MedicationEntry[]) || []}
-          onAdd={() => addRow<MedicationEntry>("medications", { name: "", dose: "", frequency: "", since: "" })}
-          onRemove={(i) => removeRow("medications", i)}
-          render={(row, i) => (
-            <>
-              <Input value={row.name} onChange={(v) => updateRow("medications", i, { name: v })} placeholder="Medicamento" className="flex-1 min-w-[140px]" />
-              <Input value={row.dose || ""} onChange={(v) => updateRow("medications", i, { dose: v })} placeholder="Dosis" className="w-28" />
-              <Input value={row.frequency || ""} onChange={(v) => updateRow("medications", i, { frequency: v })} placeholder="Frecuencia" className="w-32" />
-              <Input value={row.since || ""} onChange={(v) => updateRow("medications", i, { since: v })} placeholder="Desde" className="w-28" />
-            </>
-          )} />
-        <p className="text-xs text-gray-500 mt-4 mb-2 font-semibold uppercase">Drogas / sustancias recreativas</p>
-        <RepeatRows
-          items={(form.drugs as SubstanceEntry[]) || []}
-          onAdd={() => addRow<SubstanceEntry>("drugs", { name: "", frequency: "", since: "" })}
-          onRemove={(i) => removeRow("drugs", i)}
-          render={(row, i) => (
-            <>
-              <Input value={row.name} onChange={(v) => updateRow("drugs", i, { name: v })} placeholder="Sustancia" className="flex-1 min-w-[140px]" />
-              <Input value={row.frequency || ""} onChange={(v) => updateRow("drugs", i, { frequency: v })} placeholder="Frecuencia" className="w-32" />
-              <Input value={row.since || ""} onChange={(v) => updateRow("drugs", i, { since: v })} placeholder="Desde" className="w-28" />
-            </>
-          )} />
-      </Section>
-
-      <Section id="emergency" title="Contacto de emergencia" open={open.emergency} onToggle={toggle}>
-        <RepeatRows
-          items={(form.emergency_contacts as EmergencyContact[]) || []}
-          onAdd={() => addRow<EmergencyContact>("emergency_contacts", { name: "", phone: "", relation: "" })}
-          onRemove={(i) => removeRow("emergency_contacts", i)}
-          render={(row, i) => (
-            <>
-              <Input value={row.name} onChange={(v) => updateRow("emergency_contacts", i, { name: v })} placeholder="Nombre" className="flex-1 min-w-[140px]" />
-              <Input value={row.phone || ""} onChange={(v) => updateRow("emergency_contacts", i, { phone: v })} placeholder="Teléfono" className="w-36" />
-              <Input value={row.relation || ""} onChange={(v) => updateRow("emergency_contacts", i, { relation: v })} placeholder="Padre, pareja, amigo…" className="w-44" />
-            </>
-          )} />
-      </Section>
-
-      <Section id="extra" title="Información adicional" open={open.extra} onToggle={toggle}>
-        <Grid>
-          <Field label="Información médica extra importante" full>
-            <Textarea value={form.medical_info_extra || ""} onChange={(v) => set("medical_info_extra", v)} rows={3} />
-          </Field>
-          <Field label="Información personal importante" full>
-            <Textarea value={form.personal_info_extra || ""} onChange={(v) => set("personal_info_extra", v)} rows={3} />
-          </Field>
-        </Grid>
-      </Section>
-
-      <Section id="admin" title="Datos administrativos" open={open.admin} onToggle={toggle}>
-        <Grid>
-          <Field label="Cómo nos conoció">
-            <Select value={form.referral_source || ""} onChange={(v) => set("referral_source", v)}
-              options={[["", "—"], ["instagram", "Instagram"], ["facebook", "Facebook"], ["google", "Google"], ["referido", "Referido por otro alumno"], ["medico", "Recomendación médica"], ["otro", "Otro"]]} />
-          </Field>
-          <Field label="Consentimiento de datos personales" full>
-            <div className="space-y-2">
-              <a href={DATA_CONSENT_DOCUMENT_URL} target="_blank" rel="noreferrer"
-                className="text-xs text-[#00d4ff] underline inline-block">
-                Ver documento de tratamiento de datos personales
-              </a>
-              <label className="flex items-center gap-2 text-sm text-white">
-                <input type="checkbox" checked={!!form.informed_consent_signed}
-                  onChange={(e) => set("informed_consent_signed", e.target.checked)} />
-                Acepto el tratamiento de mis datos personales
+                <input type="checkbox" checked={(form.diseases || []).includes("otra")} onChange={() => toggleDisease("otra")} />
+                <span className="text-xs">Otra</span>
               </label>
             </div>
-          </Field>
-          <Field label="Consentimiento redes sociales">
-            <label className="flex items-center gap-2 text-sm text-white">
-              <input type="checkbox" checked={!!form.social_media_consent}
-                onChange={(e) => set("social_media_consent", e.target.checked)} />
-              Autoriza ser etiquetado en publicaciones
-            </label>
-          </Field>
-        </Grid>
-      </Section>
+            {(form.diseases || []).includes("otra") && (
+              <div className="mt-3">
+                <Field label="Especificar" full>
+                  <Input value={form.diseases_other || ""} onChange={(v) => set("diseases_other", v)} />
+                </Field>
+              </div>
+            )}
+          </Section>
+
+          <Section id="substances" title="Medicamentos y sustancias" open={open.substances} onToggle={toggle}>
+            <p className="text-xs text-gray-500 mb-2 font-semibold uppercase">Medicamentos</p>
+            <RepeatRows
+              items={(form.medications as MedicationEntry[]) || []}
+              onAdd={() => addRow<MedicationEntry>("medications", { name: "", dose: "", frequency: "", since: "" })}
+              onRemove={(i) => removeRow("medications", i)}
+              render={(row, i) => (
+                <>
+                  <Input value={row.name} onChange={(v) => updateRow("medications", i, { name: v })} placeholder="Medicamento" className="flex-1 min-w-[140px]" />
+                  <Input value={row.dose || ""} onChange={(v) => updateRow("medications", i, { dose: v })} placeholder="Dosis" className="w-28" />
+                  <Input value={row.frequency || ""} onChange={(v) => updateRow("medications", i, { frequency: v })} placeholder="Frecuencia" className="w-32" />
+                  <Input value={row.since || ""} onChange={(v) => updateRow("medications", i, { since: v })} placeholder="Desde" className="w-28" />
+                </>
+              )} />
+            <p className="text-xs text-gray-500 mt-4 mb-2 font-semibold uppercase">Drogas / sustancias recreativas</p>
+            <RepeatRows
+              items={(form.drugs as SubstanceEntry[]) || []}
+              onAdd={() => addRow<SubstanceEntry>("drugs", { name: "", frequency: "", since: "" })}
+              onRemove={(i) => removeRow("drugs", i)}
+              render={(row, i) => (
+                <>
+                  <Input value={row.name} onChange={(v) => updateRow("drugs", i, { name: v })} placeholder="Sustancia" className="flex-1 min-w-[140px]" />
+                  <Input value={row.frequency || ""} onChange={(v) => updateRow("drugs", i, { frequency: v })} placeholder="Frecuencia" className="w-32" />
+                  <Input value={row.since || ""} onChange={(v) => updateRow("drugs", i, { since: v })} placeholder="Desde" className="w-28" />
+                </>
+              )} />
+          </Section>
+
+          <Section id="sports" title="Deportes que practica" open={open.sports} onToggle={toggle}>
+            <RepeatRows
+              items={(form.sports as SportEntry[]) || []}
+              onAdd={() => addRow<SportEntry>("sports", { name: "", since: "", frequency_per_week: undefined })}
+              onRemove={(i) => removeRow("sports", i)}
+              render={(row, i) => (
+                <>
+                  <Input value={row.name} onChange={(v) => updateRow("sports", i, { name: v })} placeholder="Deporte" className="flex-1 min-w-[140px]" />
+                  <Input value={row.since || ""} onChange={(v) => updateRow("sports", i, { since: v })} placeholder="Desde (YYYY)" className="w-32" />
+                  <Input type="number" value={String(row.frequency_per_week ?? "")} onChange={(v) => updateRow("sports", i, { frequency_per_week: parseInt(v) || undefined })} placeholder="x/sem" className="w-24" />
+                </>
+              )} />
+          </Section>
+        </TabsContent>
+
+        <TabsContent value="evaluacion" className="space-y-3">
+          <Section id="evaluation" title="Evaluación inicial (opcional)" open={open.evaluation} onToggle={toggle}>
+            <p className="text-xs text-gray-400 mb-3">
+              Si estás creando o editando este perfil durante una evaluación presencial, puedes
+              registrar los datos aquí mismo. No es obligatorio: si lo dejas vacío, no se crea
+              ningún registro en el historial de evaluaciones.
+            </p>
+            <BodyEvaluationFormFields form={evalForm} onChange={setEvalForm} />
+          </Section>
+        </TabsContent>
+
+        <TabsContent value="administrativo" className="space-y-3">
+          <Section id="extra" title="Información adicional" open={open.extra} onToggle={toggle}>
+            <Grid>
+              <Field label="Información médica extra importante" full>
+                <Textarea value={form.medical_info_extra || ""} onChange={(v) => set("medical_info_extra", v)} rows={3} />
+              </Field>
+              <Field label="Información personal importante" full>
+                <Textarea value={form.personal_info_extra || ""} onChange={(v) => set("personal_info_extra", v)} rows={3} />
+              </Field>
+            </Grid>
+          </Section>
+
+          <Section id="admin" title="Datos administrativos" open={open.admin} onToggle={toggle}>
+            <Grid>
+              <Field label="Cómo nos conoció">
+                <Select value={form.referral_source || ""} onChange={(v) => set("referral_source", v)}
+                  options={[["", "—"], ["instagram", "Instagram"], ["facebook", "Facebook"], ["google", "Google"], ["referido", "Referido por otro alumno"], ["medico", "Recomendación médica"], ["otro", "Otro"]]} />
+              </Field>
+              <Field label="Consentimiento de datos personales" full>
+                <div className="space-y-2">
+                  <a href={DATA_CONSENT_DOCUMENT_URL} target="_blank" rel="noreferrer"
+                    className="text-xs text-[#00d4ff] underline inline-block">
+                    Ver documento de tratamiento de datos personales
+                  </a>
+                  <label className="flex items-center gap-2 text-sm text-white">
+                    <input type="checkbox" checked={!!form.informed_consent_signed}
+                      onChange={(e) => set("informed_consent_signed", e.target.checked)} />
+                    Acepto el tratamiento de mis datos personales
+                  </label>
+                </div>
+              </Field>
+              <Field label="Consentimiento redes sociales">
+                <label className="flex items-center gap-2 text-sm text-white">
+                  <input type="checkbox" checked={!!form.social_media_consent}
+                    onChange={(e) => set("social_media_consent", e.target.checked)} />
+                  Autoriza ser etiquetado en publicaciones
+                </label>
+              </Field>
+            </Grid>
+          </Section>
+        </TabsContent>
+      </Tabs>
 
       {/* Sticky save bar */}
       <div className="sticky bottom-0 bg-[#0a0e1a] border-t border-white/10 p-3 flex justify-end gap-2 -mx-6 -mb-6 mt-4 px-6">

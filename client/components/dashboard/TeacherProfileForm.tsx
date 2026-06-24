@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Save, Loader2, Plus, X, Award, GraduationCap, Languages, Globe, Instagram, Linkedin } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -9,6 +9,7 @@ import PhotoUploader from "./PhotoUploader";
 
 interface TeacherProfileFormProps {
   teacherId: string;
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 const SPECIALTY_SUGGESTIONS = [
@@ -22,11 +23,13 @@ const LANGUAGE_OPTIONS = [
   ["fr", "Francés"], ["de", "Alemán"], ["it", "Italiano"],
 ];
 
-export default function TeacherProfileForm({ teacherId }: TeacherProfileFormProps) {
+export default function TeacherProfileForm({ teacherId, onDirtyChange }: TeacherProfileFormProps) {
   const [form, setForm] = useState<Partial<TeacherProfile>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [newSpecialty, setNewSpecialty] = useState("");
+  const savedSnapshotRef = useRef<Partial<TeacherProfile>>({});
+  const lastDirtyRef = useRef(false);
 
   useEffect(() => {
     setLoading(true);
@@ -39,14 +42,24 @@ export default function TeacherProfileForm({ teacherId }: TeacherProfileFormProp
       const profile = profRes.success ? profRes.data : null;
       const authEmail = authRes.data?.user?.email;
       if (!profRes.success) toast.error(`Error: ${profRes.error}`);
-      setForm({
+      const loaded = {
         ...(profile ?? {}),
         // prefer the profile.email if explicitly set, fall back to auth.users
         email: profile?.email || authEmail || "",
-      });
+      };
+      setForm(loaded);
+      savedSnapshotRef.current = loaded;
       setLoading(false);
     });
   }, [teacherId]);
+
+  useEffect(() => {
+    const dirty = JSON.stringify(form) !== JSON.stringify(savedSnapshotRef.current);
+    if (dirty !== lastDirtyRef.current) {
+      lastDirtyRef.current = dirty;
+      onDirtyChange?.(dirty);
+    }
+  }, [form, onDirtyChange]);
 
   const set = <K extends keyof TeacherProfile>(k: K, v: TeacherProfile[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
@@ -88,8 +101,12 @@ export default function TeacherProfileForm({ teacherId }: TeacherProfileFormProp
     }
     setSaving(true);
     const r = await updateTeacherProfile(teacherId, form);
-    if (r.success) toast.success("Perfil guardado");
-    else toast.error(`Error: ${r.error}`);
+    if (r.success) {
+      toast.success("Perfil guardado");
+      savedSnapshotRef.current = form;
+      lastDirtyRef.current = false;
+      onDirtyChange?.(false);
+    } else toast.error(`Error: ${r.error}`);
     setSaving(false);
   };
 
