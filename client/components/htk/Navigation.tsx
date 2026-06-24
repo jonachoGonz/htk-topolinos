@@ -48,15 +48,12 @@ export default function Navigation() {
     <nav className="w-full bg-[#0a0e1a]/85 backdrop-blur-md border-b border-white/[0.06] sticky top-0 z-40">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between gap-4">
         {/* Logo */}
-        <a href="/" className="flex items-center gap-2 flex-shrink-0">
-          <svg className="w-7 h-7 sm:w-8 sm:h-8" viewBox="0 0 24 24" fill="none">
-            <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="#00d4ff" />
-            <path d="M2 17L12 22L22 17" stroke="#00d4ff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M2 12L12 17L22 12" stroke="#00d4ff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          <span className="htk-display text-xl sm:text-2xl tracking-wide">
-            HTK<span className="text-cyan-400">CENTER</span>
-          </span>
+        <a href="/" className="flex items-center flex-shrink-0">
+          <img
+            src="/brand/logo.svg"
+            alt="HTK Center"
+            className="h-7 sm:h-8 w-auto"
+          />
         </a>
 
         {/* Desktop Navigation */}

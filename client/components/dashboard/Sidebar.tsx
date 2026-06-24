@@ -134,19 +134,14 @@ export default function Sidebar({
       >
         {/* Brand */}
         <div className="px-5 py-5 border-b border-white/[0.06] flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-lg overflow-hidden flex-shrink-0 bg-[#00d4ff] flex items-center justify-center">
-              <svg width="22" height="22" viewBox="0 0 29 29" fill="none">
-                <path d="M20.575 8.15L18.525 6.1L18.875 5.725L16.3 3.15L15.925 3.5L13.875 1.45L14.6.7C15.0667.233 15.6208 0 16.2625 0C16.9042 0 17.4583.233 17.925.7L21.3 4.05C21.7667 4.517 22 5.075 22 5.725C22 6.375 21.7667 6.933 21.3 7.4L20.575 8.15ZM8.4 20.325C7.9333 20.792 7.3708 21.025 6.7125 21.025C6.0542 21.025 5.4917 20.792 5.025 20.325L1.7 16.975C1.2333 16.508 1 15.95 1 15.3C1 14.65 1.2333 14.092 1.7 13.625L2.425 12.9L4.475 14.95L4.125 15.325L6.7 17.9L7.075 17.55L9.125 19.6L8.4 20.325ZM12.875 20C12.4083 20.467 11.85 20.7 11.2 20.7C10.55 20.7 9.9917 20.467 9.525 20L2 12.475C1.5333 12.008 1.3042 11.454 1.3125 10.8125C1.3208 10.171 1.5583 9.617 2.025 9.15L3.5 7.675C3.9667 7.208 4.5208 6.975 5.1625 6.975C5.8042 6.975 6.3583 7.208 6.825 7.675L8 8.875L9.825 7.05L8.625 5.85C8.1583 5.383 7.9292 4.829 7.9375 4.1875C7.9458 3.546 8.1833 2.992 8.65 2.525L10.15 1.025C10.6167.558 11.1667.325 11.8.325C12.4333.325 12.9833.558 13.45 1.025L20.975 8.55C21.4417 9.017 21.6792 9.571 21.6875 10.2125C21.6958 10.854 21.4667 11.408 21 11.875L19.5 13.375C19.0333 13.842 18.475 14.075 17.825 14.075C17.175 14.075 16.6167 13.842 16.15 13.375L14.975 12.2L13.15 14.025L14.325 15.2C14.7917 15.667 15.0292 16.221 15.0375 16.8625C15.0458 17.504 14.8167 18.058 14.35 18.525L12.875 20Z" fill="#0A0F1A"/>
-              </svg>
-            </div>
-            <div>
-              <div className="text-white font-bold text-sm font-lexend leading-tight">
-                HTK Center
-              </div>
-              <div className="text-gray-500 text-[9px] tracking-[0.12em] uppercase font-lexend mt-0.5">
-                {brandSubtext}
-              </div>
+          <div>
+            <img
+              src="/brand/logo.svg"
+              alt="HTK Center"
+              className="h-6 w-auto"
+            />
+            <div className="text-gray-500 text-[9px] tracking-[0.12em] uppercase font-lexend mt-1">
+              {brandSubtext}
             </div>
           </div>
           <button

@@ -42,16 +42,12 @@ export default function Footer() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-10">
           {/* Logo & Description */}
           <div className="sm:col-span-2 lg:col-span-1">
-            <div className="flex items-center gap-2 mb-4">
-              <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none">
-                <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="#00d4ff" />
-                <path d="M2 17L12 22L22 17" stroke="#00d4ff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M2 12L12 17L22 12" stroke="#00d4ff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              <span className="text-base font-bold text-white">
-                {s.center_name?.split(" ")[0] || "HTK"}
-                <span className="text-cyan-400">{s.center_name?.split(" ").slice(1).join("") || "CENTER"}</span>
-              </span>
+            <div className="mb-4">
+              <img
+                src="/brand/logo.svg"
+                alt={s.center_name || "HTK Center"}
+                className="h-7 w-auto"
+              />
             </div>
             <p className="text-sm text-gray-400 leading-relaxed mb-5">
               {s.tagline || "Centro de entrenamiento de alto rendimiento y kinesiología deportiva."}
