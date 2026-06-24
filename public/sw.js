@@ -1,4 +1,4 @@
-const CACHE_NAME = "htk-v1";
+const CACHE_NAME = "htk-v2";
 const ASSETS = [
   "/",
   "/index.html",
@@ -31,8 +31,16 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const { request } = event;
 
-  // Skip API calls
-  if (request.url.includes("/api/") || request.url.includes(".netlify/functions/")) {
+  // Skip API calls — never cache these, always hit the network. This also
+  // covers Supabase (REST/Auth/Storage) since those responses are dynamic
+  // and caching an error response here (e.g. a transient 401) would keep
+  // replaying that failure forever, even after the server-side issue is
+  // fixed — a refresh would never recover.
+  if (
+    request.url.includes("/api/") ||
+    request.url.includes(".netlify/functions/") ||
+    request.url.includes(".supabase.co")
+  ) {
     return;
   }
 
@@ -41,10 +49,12 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(request, clone);
-          });
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(request, clone);
+            });
+          }
           return response;
         })
         .catch(() => caches.match(request))
@@ -58,10 +68,12 @@ self.addEventListener("fetch", (event) => {
       if (response) return response;
       return fetch(request)
         .then((response) => {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(request, clone);
-          });
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(request, clone);
+            });
+          }
           return response;
         })
         .catch(() => {
