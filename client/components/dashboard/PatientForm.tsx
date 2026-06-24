@@ -219,9 +219,7 @@ export default function PatientForm({ patientId, onSaved, onCancel, onDirtyChang
       const res = await updatePatient(patientId, form);
       if (res.success) {
         toast.success("Paciente actualizado");
-        savedSnapshotRef.current = { form, evalForm: EMPTY_BODY_EVAL_FORM };
-        lastDirtyRef.current = false;
-        onDirtyChange?.(false);
+        let evalStillDirty = false;
         if (!isBodyEvalFormEmpty(evalForm)) {
           const evalRes = await createBodyEvaluation({
             patient_id: patientId,
@@ -233,8 +231,12 @@ export default function PatientForm({ patientId, onSaved, onCancel, onDirtyChang
             setEvalForm(EMPTY_BODY_EVAL_FORM);
           } else {
             toast.error(`La evaluación inicial no se pudo guardar: ${evalRes.error}`);
+            evalStillDirty = true;
           }
         }
+        savedSnapshotRef.current = { form, evalForm: EMPTY_BODY_EVAL_FORM };
+        lastDirtyRef.current = evalStillDirty;
+        onDirtyChange?.(evalStillDirty);
         // Await aquí es clave: el wizard de onboarding usa onSaved para
         // refrescar su estado y decidir si puede avanzar al siguiente paso.
         // Sin await, el wizard quedaba con el botón "Completa los datos
