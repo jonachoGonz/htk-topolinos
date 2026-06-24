@@ -1,6 +1,12 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Mail, ArrowRight, ArrowLeft, ShieldCheck, CheckCircle2 } from "lucide-react";
+import {
+  Mail,
+  ArrowRight,
+  ArrowLeft,
+  ShieldCheck,
+  CheckCircle2,
+} from "lucide-react";
 import { supabase } from "@/services/supabase";
 import Navigation from "@/components/htk/Navigation";
 import Footer from "@/components/htk/Footer";
@@ -16,9 +22,12 @@ export default function ForgotPassword() {
     setError("");
     setLoading(true);
     try {
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+        email,
+        {
+          redirectTo: `${window.location.origin}/reset-password`,
+        },
+      );
       // No revelamos si el error es "email no existe" vs otro — Supabase no
       // distingue eso en la respuesta para evitar enumeración de usuarios.
       // Solo mostramos error en fallas reales de red/servidor; si hay `error`
@@ -63,8 +72,8 @@ export default function ForgotPassword() {
               <div className="flex flex-col items-center text-center gap-3 py-2">
                 <CheckCircle2 className="w-10 h-10 text-cyan-400" />
                 <p className="text-white text-sm font-semibold">
-                  Si el correo está registrado, te enviamos un link para restablecer
-                  tu contraseña.
+                  Si el correo está registrado, te enviamos un link para
+                  restablecer tu contraseña.
                 </p>
                 <p className="text-gray-500 text-xs">
                   Revisa tu bandeja de entrada (y la carpeta de spam).

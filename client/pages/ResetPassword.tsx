@@ -22,9 +22,12 @@ export default function ResetPassword() {
   // redirigir al dashboard correcto.
   useEffect(() => {
     if (!done || authLoading || !userRole) return;
-    navigate(userRole === "teacher" ? "/dashboard/teacher" : "/dashboard/student", {
-      replace: true,
-    });
+    navigate(
+      userRole === "teacher" ? "/dashboard/teacher" : "/dashboard/student",
+      {
+        replace: true,
+      },
+    );
   }, [done, authLoading, userRole, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -102,63 +105,69 @@ export default function ResetPassword() {
               </div>
             ) : (
               <>
-                <form onSubmit={handleSubmit} className="space-y-3.5" noValidate>
-                <label className="block">
-                  <span className="sr-only">Nueva contraseña</span>
-                  <div className="relative">
-                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                    <input
-                      type="password"
-                      placeholder="Nueva contraseña"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      disabled={submitting || done}
-                      autoComplete="new-password"
-                      className="
+                <form
+                  onSubmit={handleSubmit}
+                  className="space-y-3.5"
+                  noValidate
+                >
+                  <label className="block">
+                    <span className="sr-only">Nueva contraseña</span>
+                    <div className="relative">
+                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                      <input
+                        type="password"
+                        placeholder="Nueva contraseña"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        disabled={submitting || done}
+                        autoComplete="new-password"
+                        className="
                         w-full bg-white/[0.03] border border-white/[0.08] rounded-xl
                         pl-11 pr-4 py-3.5 text-sm text-white placeholder-gray-500
                         focus:outline-none focus:border-cyan-400/40 focus:bg-white/[0.05]
                         transition disabled:opacity-50
                       "
-                    />
-                  </div>
-                </label>
+                      />
+                    </div>
+                  </label>
 
-                <label className="block">
-                  <span className="sr-only">Confirmar contraseña</span>
-                  <div className="relative">
-                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                    <input
-                      type="password"
-                      placeholder="Confirmar contraseña"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      disabled={submitting || done}
-                      autoComplete="new-password"
-                      className="
+                  <label className="block">
+                    <span className="sr-only">Confirmar contraseña</span>
+                    <div className="relative">
+                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                      <input
+                        type="password"
+                        placeholder="Confirmar contraseña"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        disabled={submitting || done}
+                        autoComplete="new-password"
+                        className="
                         w-full bg-white/[0.03] border border-white/[0.08] rounded-xl
                         pl-11 pr-4 py-3.5 text-sm text-white placeholder-gray-500
                         focus:outline-none focus:border-cyan-400/40 focus:bg-white/[0.05]
                         transition disabled:opacity-50
                       "
-                    />
-                  </div>
-                </label>
+                      />
+                    </div>
+                  </label>
 
-                {error && (
-                  <div
-                    role="alert"
-                    className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-rose-500/10 border border-rose-500/25 text-rose-300 text-xs"
-                  >
-                    <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-                    <span className="leading-relaxed">{error}</span>
-                  </div>
-                )}
+                  {error && (
+                    <div
+                      role="alert"
+                      className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-rose-500/10 border border-rose-500/25 text-rose-300 text-xs"
+                    >
+                      <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                      <span className="leading-relaxed">{error}</span>
+                    </div>
+                  )}
 
-                <button
-                  type="submit"
-                  disabled={submitting || done || !password || !confirmPassword}
-                  className="
+                  <button
+                    type="submit"
+                    disabled={
+                      submitting || done || !password || !confirmPassword
+                    }
+                    className="
                     group w-full flex items-center justify-center gap-2
                     bg-cyan-400 hover:bg-cyan-300 text-[#0a0e1a] font-bold text-sm
                     rounded-xl py-3.5
@@ -167,21 +176,21 @@ export default function ResetPassword() {
                     active:scale-[0.98]
                     disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none
                   "
-                >
-                  {submitting ? (
-                    <>
-                      <span className="w-3 h-3 border-2 border-[#0a0e1a]/30 border-t-[#0a0e1a] rounded-full animate-spin" />
-                      Guardando…
-                    </>
-                  ) : done ? (
-                    "Redirigiendo…"
-                  ) : (
-                    <>
-                      Actualizar contraseña
-                      <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
-                    </>
-                  )}
-                </button>
+                  >
+                    {submitting ? (
+                      <>
+                        <span className="w-3 h-3 border-2 border-[#0a0e1a]/30 border-t-[#0a0e1a] rounded-full animate-spin" />
+                        Guardando…
+                      </>
+                    ) : done ? (
+                      "Redirigiendo…"
+                    ) : (
+                      <>
+                        Actualizar contraseña
+                        <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+                      </>
+                    )}
+                  </button>
                 </form>
 
                 {done && (
