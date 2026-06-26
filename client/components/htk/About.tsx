@@ -1,4 +1,8 @@
 import { CircleCheck } from "lucide-react";
+import ABOUT_IMG from "@/assets/home/about-main.webp";
+import facility1 from "@/assets/home/facility-1.webp";
+import facility2 from "@/assets/home/facility-2.webp";
+import facility3 from "@/assets/home/facility-3.webp";
 
 // Diferenciales reales — sin números inflados.
 const stats = [
@@ -9,25 +13,10 @@ const stats = [
 ];
 
 const facilities = [
-  {
-    title: "Zona de Pesas",
-    image:
-      "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=1200&q=80",
-  },
-  {
-    title: "Área Kinésica",
-    image:
-      "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?auto=format&fit=crop&w=900&q=80",
-  },
-  {
-    title: "Cancha Exterior",
-    image:
-      "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&w=900&q=80",
-  },
+  { title: "Zona de Pesas", image: facility1 },
+  { title: "Área Kinésica", image: facility2 },
+  { title: "Cancha Exterior", image: facility3 },
 ];
-
-const ABOUT_IMG =
-  "https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?auto=format&fit=crop&w=1200&q=80";
 
 export default function About() {
   return (

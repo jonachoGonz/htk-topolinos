@@ -1,4 +1,5 @@
 import { Star, Heart, Activity, Target, Clock, ChevronDown, ArrowRight } from "lucide-react";
+import HERO_BG from "@/assets/home/hero-bg.webp";
 
 // Diferenciales reales del centro — los números inflados (500+ atletas,
 // 98% recuperación, 24/7) se sacaron porque no aplican: el centro es
@@ -9,10 +10,6 @@ const stats = [
   { icon: Target,   value: "Tu meta",    label: "Plan según tus objetivos" },
   { icon: Clock,    value: "L–V · 7–22h", label: "Sáb 09–18h" },
 ];
-
-// Editorial-grade Unsplash photos (replaceable with real shots later).
-const HERO_BG =
-  "https://images.unsplash.com/photo-1599058917212-d750089bc07e?auto=format&fit=crop&w=1920&q=80";
 
 export default function Hero() {
   return (
