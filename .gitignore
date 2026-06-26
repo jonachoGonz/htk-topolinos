@@ -25,3 +25,22 @@ dist-ssr
 
 .config/
 !.env
+
+# Stale session/handoff/status docs from past AI sessions — useful as local
+# scratch notes while working, but shouldn't accumulate in the repo. Legit
+# project docs (AGENTS.md, CLAUDE.md, DESIGN.md, PRODUCT.md, docs/superpowers/**)
+# are not affected by this list.
+MVP_CALENDAR_IMPLEMENTATION_PLAN.md
+MVP_CALENDAR_SESSION_HANDOFF.md
+NETLIFY_DEPLOY_GUIDE.md
+PATIENT_FUTURE_IMPROVEMENTS.md
+PHASE_5_COMPLETE.md
+PHASE_5_PROGRESS.md
+PHASE_5_TESTING_GUIDE.md
+PHASE_6_OPTIMIZATION_RESULTS.md
+PHASE_7_8_9_SUMMARY.md
+PRODUCTION_DEPLOYMENT_SUMMARY.md
+PROJECT_ROADMAP.md
+SESSION_SUMMARY_PHASE5.md
+SUPABASE_SETUP.md
+VERIFICACION_TABLAS.md
