@@ -43,14 +43,22 @@ export default function PatientDetailPage() {
   const confirmLeaveIfDirty = () =>
     !formDirty || confirm("Tienes cambios sin guardar. ¿Deseas salir de todas maneras?");
 
+  // Destino fijo en vez de navigate(-1): el historial del navegador no es
+  // confiable acá (puede traer al usuario de vuelta al dashboard o a otra
+  // sección según por dónde haya entrado, en vez del listado de alumnos).
   const handleBack = () => {
     if (!confirmLeaveIfDirty()) return;
-    navigate(-1);
+    navigate("/dashboard/teacher?tab=patients");
   };
 
   const handleTabClick = (next: Tab) => {
     if (tab === "form" && next !== "form" && !confirmLeaveIfDirty()) return;
     setSearchParams(next === "form" ? {} : { tab: next });
+  };
+
+  const goToDashboardTab = (t: string) => {
+    if (!confirmLeaveIfDirty()) return;
+    navigate(`/dashboard/teacher?tab=${t}`);
   };
 
   const criticalConditions = (patient?.diseases || []).filter((d) => CRITICAL_KEYS.has(d));
@@ -64,14 +72,14 @@ export default function PatientDetailPage() {
         onClose={() => setSidebarOpen(false)}
         userRole="teacher"
         activeTab="patients"
-        onTabChange={(t) => navigate(`/dashboard/teacher?tab=${t}`)}
+        onTabChange={goToDashboardTab}
       />
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden lg:ml-0">
         <DashboardTopBar
           onMenuToggle={() => setSidebarOpen(true)}
           activeTab="patients"
-          onTabChange={(t) => navigate(`/dashboard/teacher?tab=${t}`)}
+          onTabChange={goToDashboardTab}
         />
 
         <main className="flex-1 overflow-y-auto bg-[#0a0e1a] px-5 pt-5 lg:px-6 lg:pt-6 pb-[calc(80px+env(safe-area-inset-bottom))] lg:pb-6">
@@ -141,7 +149,7 @@ export default function PatientDetailPage() {
                 <PatientForm
                   patientId={id}
                   onSaved={refresh}
-                  onCancel={() => navigate(-1)}
+                  onCancel={() => navigate("/dashboard/teacher?tab=patients")}
                   onDirtyChange={setFormDirty}
                 />
               )}
@@ -161,7 +169,7 @@ export default function PatientDetailPage() {
         </main>
       </div>
 
-      <BottomNav userRole="teacher" activeTab="patients" onTabChange={(t) => navigate(`/dashboard/teacher?tab=${t}`)} />
+      <BottomNav userRole="teacher" activeTab="patients" onTabChange={goToDashboardTab} />
     </div>
   );
 }
