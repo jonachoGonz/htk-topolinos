@@ -1,4 +1,7 @@
 import { Heart, Activity, Brain, Apple, Dumbbell, ArrowRight } from "lucide-react";
+import services1 from "@/assets/home/services-1.webp";
+import services2 from "@/assets/home/services-2.webp";
+import services3 from "@/assets/home/services-3.webp";
 
 const services = [
   {
@@ -7,8 +10,7 @@ const services = [
       "Evaluamos tu movimiento según tus necesidades para prevenir lesiones y orientar tu plan de trabajo.",
     icon: Heart,
     tag: "Diagnóstico",
-    image:
-      "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?auto=format&fit=crop&w=900&q=80",
+    image: services1,
   },
   {
     title: "Preparación Física",
@@ -16,8 +18,7 @@ const services = [
       "Programas personalizados según tu deporte, tu nivel y los objetivos que tú definas.",
     icon: Activity,
     tag: "Entrenamiento",
-    image:
-      "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=900&q=80",
+    image: services2,
   },
   {
     title: "Kinesiología Deportiva",
@@ -25,8 +26,7 @@ const services = [
       "Recuperación funcional con seguimiento cercano y un plan que se adapta a tu evolución.",
     icon: Brain,
     tag: "Recuperación",
-    image:
-      "https://images.unsplash.com/photo-1599447421416-3414500d18a5?auto=format&fit=crop&w=900&q=80",
+    image: services3,
   },
 ];
 
