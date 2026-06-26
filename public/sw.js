@@ -1,4 +1,4 @@
-const CACHE_NAME = "htk-v2";
+const CACHE_NAME = "htk-v3";
 const ASSETS = [
   "/",
   "/index.html",
@@ -62,26 +62,49 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Cache first for assets
+  // Cache first only for genuinely static, immutable-ish assets (images,
+  // fonts). Scripts/styles/modules go network-first below — caching app
+  // code with no revalidation means a browser that already installed the
+  // SW would keep serving pre-deploy JS/CSS forever after a new release,
+  // since cache-first never re-checks the network.
+  if (request.destination === "image" || request.destination === "font") {
+    event.respondWith(
+      caches.match(request).then((response) => {
+        if (response) return response;
+        return fetch(request)
+          .then((response) => {
+            if (response.ok) {
+              const clone = response.clone();
+              caches.open(CACHE_NAME).then((cache) => {
+                cache.put(request, clone);
+              });
+            }
+            return response;
+          })
+          .catch(() => {
+            if (request.destination === "image") {
+              return caches.match("/placeholder.svg");
+            }
+          });
+      })
+    );
+    return;
+  }
+
+  // Network first for everything else (scripts, styles, modules, data) —
+  // falls back to cache only when actually offline.
   event.respondWith(
-    caches.match(request).then((response) => {
-      if (response) return response;
-      return fetch(request)
-        .then((response) => {
-          if (response.ok) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(request, clone);
-            });
-          }
-          return response;
-        })
-        .catch(() => {
-          if (request.destination === "image") {
-            return caches.match("/placeholder.svg");
-          }
-        });
-    })
+    fetch(request)
+      .then((response) => {
+        if (response.ok) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(request, clone);
+          });
+        }
+        return response;
+      })
+      .catch(() => caches.match(request))
   );
 });
 

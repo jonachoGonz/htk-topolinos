@@ -8,6 +8,8 @@ import AdminSettings from "@/components/admin/AdminSettings";
 
 type AdminTab = "reports" | "students" | "teachers" | "plans" | "assignments" | "settings";
 
+const VALID_ADMIN_TABS: AdminTab[] = ["reports", "students", "teachers", "plans", "assignments", "settings"];
+
 const TABS: { value: AdminTab; label: string; icon: any }[] = [
   { value: "reports",     label: "Reportes",        icon: BarChart3 },
   { value: "students",    label: "Alumnos",         icon: Users },
@@ -17,8 +19,16 @@ const TABS: { value: AdminTab; label: string; icon: any }[] = [
   { value: "settings",    label: "Configuración",   icon: Settings },
 ];
 
+// Lee el sub-tab inicial desde ?admintab= en la URL (permite deep-link, ej.
+// desde el botón "Volver" de TeacherDetailPage hacia Administración → Profesionales).
+// Igual que TeacherDashboard hace con su propio ?tab=, solo se lee al montar.
+function initialAdminTab(): AdminTab {
+  const v = new URLSearchParams(window.location.search).get("admintab");
+  return VALID_ADMIN_TABS.includes(v as AdminTab) ? (v as AdminTab) : "reports";
+}
+
 export default function AdminSection() {
-  const [tab, setTab] = useState<AdminTab>("reports");
+  const [tab, setTab] = useState<AdminTab>(initialAdminTab);
 
   return (
     <div>

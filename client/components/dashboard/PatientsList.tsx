@@ -1,6 +1,9 @@
 import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Eye, Search, Pause, Loader2, Trash2, MessageCircle, AlertTriangle, UserPlus, X, Mail, Loader } from "lucide-react";
+import {
+  Eye, Search, Pause, Trash2, MessageCircle, AlertTriangle, UserPlus, X, Mail, Loader,
+  ChevronUp, ChevronDown,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -13,6 +16,7 @@ import {
   type PatientProfile,
   type PatientAttendance,
 } from "@/services/supabase";
+import { Skeleton } from "./Skeleton";
 
 interface PatientsListProps {
   professionalId?: string;
@@ -115,6 +119,47 @@ export default function PatientsList({ roleFilter = "student" }: PatientsListPro
     });
   }, [patients, search, showPaused]);
 
+  type SortField = "name" | "age" | "sessions" | "attendance" | "last";
+  const [sortField, setSortField] = useState<SortField | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
+  const toggleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDir("asc");
+    }
+  };
+
+  const sorted = useMemo(() => {
+    if (!sortField) return filtered;
+    const dir = sortDir === "asc" ? 1 : -1;
+    const valueFor = (p: PatientProfile): number | string => {
+      switch (sortField) {
+        case "name":
+          return (p.full_name || "").toLowerCase();
+        case "age":
+          return computeAge(p.birth_date) ?? -1;
+        case "sessions":
+          return attendance[p.id]?.confirmed_count ?? -1;
+        case "attendance":
+          return attendance[p.id]?.attendance_rate_pct ?? -1;
+        case "last": {
+          const d = attendance[p.id]?.last_attended_session;
+          return d ? new Date(d).getTime() : -1;
+        }
+      }
+    };
+    return [...filtered].sort((a, b) => {
+      const va = valueFor(a);
+      const vb = valueFor(b);
+      if (va < vb) return -1 * dir;
+      if (va > vb) return 1 * dir;
+      return 0;
+    });
+  }, [filtered, sortField, sortDir, attendance]);
+
   const handleCreate = async () => {
     if (!createForm.full_name.trim() || !createForm.email.trim()) {
       toast.error("Nombre y email son requeridos");
@@ -192,123 +237,65 @@ export default function PatientsList({ roleFilter = "student" }: PatientsListPro
 
       {/* List */}
       {loading ? (
-        <div className="py-8 flex items-center justify-center text-gray-500">
-          <Loader2 className="w-5 h-5 animate-spin mr-2" /> Cargando pacientes...
-        </div>
-      ) : filtered.length === 0 ? (
+        <>
+          <DesktopSkeletonRows showAttendanceCols={!isTeacherView} />
+          <MobileSkeletonRows />
+        </>
+      ) : sorted.length === 0 ? (
         <div className="py-8 text-center text-gray-500">
           {patients.length === 0 ? "No hay pacientes registrados." : "Sin resultados."}
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-          {filtered.map((p) => {
-            const att = attendance[p.id];
-            const age = computeAge(p.birth_date);
-            const criticalConditions = (p.diseases || []).filter((d) =>
-              CRITICAL_DISEASE_KEYS.has(d)
-            );
-            const parqNotCleared = p.parq_cleared === false;
-            const waLink = p.phone ? whatsappLink(p.phone) : "";
-            return (
-              <div key={p.id}
-                className={`bg-[#0f131a] border rounded-xl p-4 space-y-3 transition ${
-                  p.is_paused ? "border-amber-500/30 opacity-75" : "border-white/[0.06] hover:border-white/10"
-                }`}>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-3 min-w-0 flex-1">
-                    {p.photo_url ? (
-                      <img src={p.photo_url} alt="" className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full bg-[#00d4ff]/10 border border-[#00d4ff]/20 flex items-center justify-center flex-shrink-0">
-                        <span className="text-[#00d4ff] font-bold text-sm">
-                          {(p.full_name || "?").charAt(0).toUpperCase()}
-                        </span>
-                      </div>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className="text-white font-semibold font-lexend text-sm truncate">{p.full_name || "Sin nombre"}</p>
-                      <div className="flex items-center gap-2 flex-wrap mt-0.5">
-                        {p.email && <span className="text-gray-500 text-xs truncate max-w-[160px]">{p.email}</span>}
-                        {age != null && <span className="text-gray-400 text-xs">{age} años</span>}
-                        {p.is_paused && (
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                            <Pause className="w-3 h-3" /> Pausado
-                          </span>
-                        )}
-                      </div>
-                      {/* Critical alerts row */}
-                      {(criticalConditions.length > 0 || parqNotCleared) && (
-                        <div className="flex items-center gap-1 flex-wrap mt-1.5">
-                          {parqNotCleared && (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-500/15 text-red-300 border border-red-500/30">
-                              <AlertTriangle className="w-3 h-3" /> PAR-Q no apto
-                            </span>
-                          )}
-                          {criticalConditions.map((d) => (
-                            <span
-                              key={d}
-                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-500/10 text-red-300 border border-red-500/20"
-                            >
-                              {CRITICAL_DISEASE_LABELS[d] || d}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  {/* Quick WhatsApp contact */}
-                  {waLink && (
-                    <a
-                      href={waLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title="Contactar por WhatsApp"
-                      className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition flex-shrink-0"
-                    >
-                      <MessageCircle className="w-4 h-4" />
-                    </a>
+        <>
+          {/* Desktop: real table with sortable columns */}
+          <div className="hidden lg:block border border-white/[0.06] rounded-xl">
+            <table className="w-full text-sm border-collapse">
+              <thead className="sticky top-0 z-10 bg-[#0a0e1a]">
+                <tr className="border-b border-white/[0.06]">
+                  <SortHeader label={entityLabel === "profesional" ? "Profesional" : "Alumno"} field="name" sortField={sortField} sortDir={sortDir} onSort={toggleSort} className="pl-4" />
+                  <SortHeader label="Edad" field="age" sortField={sortField} sortDir={sortDir} onSort={toggleSort} />
+                  <th className="text-left px-3 py-2.5 text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Estado</th>
+                  {!isTeacherView && (
+                    <>
+                      <SortHeader label="Sesiones" field="sessions" sortField={sortField} sortDir={sortDir} onSort={toggleSort} />
+                      <SortHeader label="Asistencia" field="attendance" sortField={sortField} sortDir={sortDir} onSort={toggleSort} />
+                      <SortHeader label="Última" field="last" sortField={sortField} sortDir={sortDir} onSort={toggleSort} />
+                    </>
                   )}
-                </div>
+                  <th className="text-right px-4 py-2.5 text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/[0.06]">
+                {sorted.map((p) => (
+                  <PatientRow
+                    key={p.id}
+                    patient={p}
+                    attendance={attendance[p.id]}
+                    isTeacherView={isTeacherView}
+                    isAdmin={isAdmin}
+                    onOpen={() => navigate(isTeacherView ? `/dashboard/teachers/${p.id}` : `/dashboard/patients/${p.id}`)}
+                    onDelete={() => handleDelete(p)}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-                {/* Mini stats */}
-                <div className="grid grid-cols-3 gap-2 pt-2 border-t border-white/[0.04]">
-                  <div>
-                    <p className="text-[9px] uppercase text-gray-600">Sesiones</p>
-                    <p className="text-white text-sm font-semibold">{att?.confirmed_count ?? 0}</p>
-                  </div>
-                  <div>
-                    <p className="text-[9px] uppercase text-gray-600">Asistencia</p>
-                    <p className="text-emerald-400 text-sm font-semibold">
-                      {att?.attendance_rate_pct != null ? `${att.attendance_rate_pct}%` : "—"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[9px] uppercase text-gray-600">Última</p>
-                    <p className="text-gray-300 text-xs">
-                      {att?.last_attended_session
-                        ? new Date(att.last_attended_session).toLocaleDateString()
-                        : "—"}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="flex gap-2 pt-2 border-t border-white/[0.04]">
-                  <button onClick={() => navigate(isTeacherView ? `/dashboard/teachers/${p.id}` : `/dashboard/patients/${p.id}`)}
-                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 bg-[#00d4ff]/10 border border-[#00d4ff]/30 text-[#00d4ff] rounded-lg text-xs font-semibold hover:bg-[#00d4ff]/20 transition">
-                    <Eye className="w-3.5 h-3.5" /> Ver / Editar
-                  </button>
-                  {isAdmin && (
-                    <button onClick={() => handleDelete(p)}
-                      className="px-3 py-1.5 bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg text-xs font-semibold hover:bg-red-500/20 transition">
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+          {/* Mobile: compact row list */}
+          <div className="lg:hidden divide-y divide-white/[0.06] border border-white/[0.06] rounded-xl overflow-hidden">
+            {sorted.map((p) => (
+              <PatientRowMobile
+                key={p.id}
+                patient={p}
+                attendance={attendance[p.id]}
+                isTeacherView={isTeacherView}
+                isAdmin={isAdmin}
+                onOpen={() => navigate(isTeacherView ? `/dashboard/teachers/${p.id}` : `/dashboard/patients/${p.id}`)}
+                onDelete={() => handleDelete(p)}
+              />
+            ))}
+          </div>
+        </>
       )}
 
       {/* Create patient modal */}
@@ -407,10 +394,12 @@ export default function PatientsList({ roleFilter = "student" }: PatientsListPro
                 </span>
               </label>
 
-              <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-2 text-[10px] text-blue-200">
-                <Mail className="inline w-3 h-3 mr-1" />
-                Requiere variables SUPABASE_SERVICE_ROLE_KEY + SUPABASE_URL en Netlify para funcionar en producción.
-              </div>
+              {createForm.send_invite && (
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-2 text-[10px] text-blue-200">
+                  <Mail className="inline w-3 h-3 mr-1" />
+                  Si el envío de invitaciones por email no está disponible, crea la cuenta con una contraseña inicial en su lugar.
+                </div>
+              )}
             </div>
 
             <div className="px-5 py-3 border-t border-white/10 flex justify-end gap-2">
@@ -443,5 +432,279 @@ function Input({ value, onChange, type = "text" }: any) {
   return (
     <input type={type} value={value} onChange={(e) => onChange(e.target.value)}
       className="w-full bg-[#0f131a] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#00d4ff]/40" />
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Table / list rendering (desktop sortable table + mobile compact row list)
+// ---------------------------------------------------------------------------
+
+function SortHeader({ label, field, sortField, sortDir, onSort, className = "" }: {
+  label: string;
+  field: "name" | "age" | "sessions" | "attendance" | "last";
+  sortField: string | null;
+  sortDir: "asc" | "desc";
+  onSort: (field: any) => void;
+  className?: string;
+}) {
+  const active = sortField === field;
+  return (
+    <th className={`text-left px-3 py-2.5 ${className}`}>
+      <button
+        onClick={() => onSort(field)}
+        className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider text-gray-500 font-semibold hover:text-gray-300 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00d4ff]/60 rounded"
+      >
+        {label}
+        <span className="flex flex-col -space-y-1.5">
+          <ChevronUp className={`w-3 h-3 ${active && sortDir === "asc" ? "text-[#00d4ff]" : "text-gray-600"}`} />
+          <ChevronDown className={`w-3 h-3 ${active && sortDir === "desc" ? "text-[#00d4ff]" : "text-gray-600"}`} />
+        </span>
+      </button>
+    </th>
+  );
+}
+
+function patientAlerts(p: PatientProfile) {
+  const criticalConditions = (p.diseases || []).filter((d) => CRITICAL_DISEASE_KEYS.has(d));
+  const parqNotCleared = p.parq_cleared === false;
+  return { criticalConditions, parqNotCleared };
+}
+
+function StatusBadges({ patient, emptyFallback = true }: { patient: PatientProfile; emptyFallback?: boolean }) {
+  const { criticalConditions, parqNotCleared } = patientAlerts(patient);
+  const hasAlerts = patient.is_paused || parqNotCleared || criticalConditions.length > 0;
+  if (!hasAlerts) {
+    return emptyFallback ? <span className="text-gray-600 text-xs">—</span> : null;
+  }
+  return (
+    <div className="flex items-center gap-1 flex-wrap">
+      {patient.is_paused && (
+        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+          <Pause className="w-3 h-3" /> Pausado
+        </span>
+      )}
+      {parqNotCleared && (
+        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-500/15 text-red-300 border border-red-500/30">
+          <AlertTriangle className="w-3 h-3" /> PAR-Q
+        </span>
+      )}
+      {criticalConditions.map((d) => (
+        <span key={d} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-500/10 text-red-300 border border-red-500/20">
+          {CRITICAL_DISEASE_LABELS[d] || d}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function PatientAvatar({ patient, size = "w-9 h-9" }: { patient: PatientProfile; size?: string }) {
+  if (patient.photo_url) {
+    return <img src={patient.photo_url} alt="" className={`${size} rounded-full object-cover flex-shrink-0`} />;
+  }
+  return (
+    <div className={`${size} rounded-full bg-[#00d4ff]/10 border border-[#00d4ff]/20 flex items-center justify-center flex-shrink-0`}>
+      <span className="text-[#00d4ff] font-bold text-sm">{(patient.full_name || "?").charAt(0).toUpperCase()}</span>
+    </div>
+  );
+}
+
+interface RowProps {
+  patient: PatientProfile;
+  attendance?: PatientAttendance;
+  isTeacherView: boolean;
+  isAdmin: boolean;
+  onOpen: () => void;
+  onDelete: () => void;
+}
+
+function PatientRow({ patient: p, attendance: att, isTeacherView, isAdmin, onOpen, onDelete }: RowProps) {
+  const age = computeAge(p.birth_date);
+  const waLink = p.phone ? whatsappLink(p.phone) : "";
+
+  return (
+    <tr
+      tabIndex={0}
+      role="button"
+      aria-label={`Ver / editar a ${p.full_name || "este registro"}`}
+      onClick={onOpen}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen();
+        }
+      }}
+      className={`cursor-pointer transition hover:bg-white/[0.03] focus-visible:outline-none focus-visible:bg-white/[0.04] focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#00d4ff]/60 ${
+        p.is_paused ? "opacity-60" : ""
+      }`}
+    >
+      <td className="px-3 py-2.5 pl-4">
+        <div className="flex items-center gap-3 min-w-0">
+          <PatientAvatar patient={p} />
+          <div className="min-w-0">
+            <p className="text-white font-semibold font-lexend text-sm truncate max-w-[220px]">{p.full_name || "Sin nombre"}</p>
+            {p.email && <p className="text-gray-500 text-xs truncate max-w-[220px]">{p.email}</p>}
+          </div>
+        </div>
+      </td>
+      <td className="px-3 py-2.5 text-gray-300 tabular-nums whitespace-nowrap">{age != null ? `${age} años` : "—"}</td>
+      <td className="px-3 py-2.5"><StatusBadges patient={p} /></td>
+      {!isTeacherView && (
+        <>
+          <td className="px-3 py-2.5 text-white font-semibold tabular-nums">{att?.confirmed_count ?? 0}</td>
+          <td className="px-3 py-2.5 text-emerald-400 font-semibold tabular-nums">
+            {att?.attendance_rate_pct != null ? `${att.attendance_rate_pct}%` : "—"}
+          </td>
+          <td className="px-3 py-2.5 text-gray-300 whitespace-nowrap">
+            {att?.last_attended_session ? new Date(att.last_attended_session).toLocaleDateString() : "—"}
+          </td>
+        </>
+      )}
+      <td className="px-4 py-2.5">
+        <div className="flex items-center justify-end gap-1.5">
+          {waLink && (
+            <a
+              href={waLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Contactar por WhatsApp"
+              onClick={(e) => e.stopPropagation()}
+              className="p-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition"
+            >
+              <MessageCircle className="w-3.5 h-3.5" />
+            </a>
+          )}
+          {isAdmin && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onDelete(); }}
+              title="Eliminar"
+              className="p-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+          <span className="p-1.5 rounded-lg text-gray-500" aria-hidden="true">
+            <Eye className="w-3.5 h-3.5" />
+          </span>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+function PatientRowMobile({ patient: p, attendance: att, isTeacherView, isAdmin, onOpen, onDelete }: RowProps) {
+  const age = computeAge(p.birth_date);
+  const waLink = p.phone ? whatsappLink(p.phone) : "";
+
+  return (
+    <div
+      tabIndex={0}
+      role="button"
+      aria-label={`Ver / editar a ${p.full_name || "este registro"}`}
+      onClick={onOpen}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen();
+        }
+      }}
+      className={`px-4 py-3 cursor-pointer transition hover:bg-white/[0.03] focus-visible:outline-none focus-visible:bg-white/[0.04] focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#00d4ff]/60 ${
+        p.is_paused ? "opacity-60" : ""
+      }`}
+    >
+      <div className="flex items-start gap-3">
+        <PatientAvatar patient={p} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-white font-semibold font-lexend text-sm truncate">{p.full_name || "Sin nombre"}</p>
+            <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+              {waLink && (
+                <a href={waLink} target="_blank" rel="noopener noreferrer" title="Contactar por WhatsApp"
+                  className="p-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                  <MessageCircle className="w-3.5 h-3.5" />
+                </a>
+              )}
+              {isAdmin && (
+                <button onClick={onDelete} title="Eliminar"
+                  className="p-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap mt-0.5 text-xs text-gray-500">
+            {p.email && <span className="truncate max-w-[160px]">{p.email}</span>}
+            {age != null && <span className="text-gray-400">{age} años</span>}
+          </div>
+          <div className="empty:hidden mt-1.5">
+            <StatusBadges patient={p} emptyFallback={false} />
+          </div>
+          {!isTeacherView && (
+            <div className="flex items-center gap-3 mt-2 text-xs">
+              <span className="text-gray-600">
+                <span className="text-white font-semibold tabular-nums">{att?.confirmed_count ?? 0}</span> sesiones
+              </span>
+              <span className="text-gray-600">
+                <span className="text-emerald-400 font-semibold tabular-nums">
+                  {att?.attendance_rate_pct != null ? `${att.attendance_rate_pct}%` : "—"}
+                </span> asistencia
+              </span>
+              <span className="text-gray-600">
+                {att?.last_attended_session ? new Date(att.last_attended_session).toLocaleDateString() : "—"}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DesktopSkeletonRows({ showAttendanceCols }: { showAttendanceCols: boolean }) {
+  return (
+    <div className="hidden lg:block border border-white/[0.06] rounded-xl" aria-hidden="true">
+      <table className="w-full text-sm">
+        <tbody className="divide-y divide-white/[0.06]">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <tr key={i}>
+              <td className="px-3 py-2.5 pl-4">
+                <div className="flex items-center gap-3">
+                  <Skeleton className="w-9 h-9 rounded-full" />
+                  <div className="space-y-1.5">
+                    <Skeleton className="h-3 w-32 rounded" />
+                    <Skeleton className="h-2.5 w-40 rounded" />
+                  </div>
+                </div>
+              </td>
+              <td className="px-3 py-2.5"><Skeleton className="h-3 w-10 rounded" /></td>
+              <td className="px-3 py-2.5"><Skeleton className="h-3 w-16 rounded" /></td>
+              {showAttendanceCols && (
+                <>
+                  <td className="px-3 py-2.5"><Skeleton className="h-3 w-8 rounded" /></td>
+                  <td className="px-3 py-2.5"><Skeleton className="h-3 w-10 rounded" /></td>
+                  <td className="px-3 py-2.5"><Skeleton className="h-3 w-16 rounded" /></td>
+                </>
+              )}
+              <td className="px-4 py-2.5" />
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function MobileSkeletonRows() {
+  return (
+    <div className="lg:hidden divide-y divide-white/[0.06] border border-white/[0.06] rounded-xl overflow-hidden" aria-hidden="true">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} className="px-4 py-3 flex items-center gap-3">
+          <Skeleton className="w-9 h-9 rounded-full" />
+          <div className="flex-1 space-y-1.5">
+            <Skeleton className="h-3 w-2/3 rounded" />
+            <Skeleton className="h-2.5 w-1/2 rounded" />
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
